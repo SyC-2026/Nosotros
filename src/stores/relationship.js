@@ -14,6 +14,28 @@ export const useRelationshipStore = defineStore('relationship', () => {
   const name1 = 'Santi'
   const name2 = 'Cami'
 
+  // --- Tema activo ('cami' | 'santi') ---
+  const currentTheme = ref(localStorage.getItem('nosotros_theme') || 'cami')
+
+  function applyTheme(theme) {
+    if (typeof document !== 'undefined') {
+      if (theme === 'santi') {
+        document.body.classList.add('theme-santi')
+      } else {
+        document.body.classList.remove('theme-santi')
+      }
+    }
+  }
+
+  function setTheme(theme) {
+    currentTheme.value = theme
+    localStorage.setItem('nosotros_theme', theme)
+    applyTheme(theme)
+  }
+
+  // Inicializar clase en body
+  applyTheme(currentTheme.value)
+
   // --- Intento de desbloqueo ---
   function tryUnlock(inputDate) {
     if (inputDate === UNLOCK_DATE) {
@@ -65,6 +87,8 @@ export const useRelationshipStore = defineStore('relationship', () => {
     coupleNames,
     name1,
     name2,
+    currentTheme,
+    setTheme,
     tryUnlock,
     lock,
     daysTogther,

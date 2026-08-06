@@ -56,21 +56,21 @@ const currentComponent = computed(() => {
   width: 42px;
   height: 42px;
   border-radius: 10px;
-  background: rgba(255, 252, 245, 0.9);
-  border: 1.5px solid rgba(192, 148, 108, 0.35);
-  box-shadow: 0 2px 12px rgba(120, 70, 30, 0.14);
+  background: var(--theme-card-bg);
+  border: 1.5px solid var(--theme-card-border);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 1.35rem;
-  color: #7a4f3a;
+  color: var(--theme-text-main);
   cursor: pointer;
-  transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  transition: background 0.4s ease, border-color 0.4s ease, color 0.4s ease, transform 0.2s ease, box-shadow 0.2s ease;
   backdrop-filter: blur(8px);
 }
 .btn-hamburger:hover {
-  background: rgba(255, 248, 240, 1);
-  box-shadow: 0 4px 18px rgba(120, 70, 30, 0.2);
+  color: var(--theme-primary);
+  border-color: var(--theme-secondary);
   transform: scale(1.06);
 }
 

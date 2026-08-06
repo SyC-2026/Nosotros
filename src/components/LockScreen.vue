@@ -1,7 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRelationshipStore } from '../stores/relationship.js'
-import vintageBg from '../assets/vintage_bg.png'
 import { Icon } from '@iconify/vue'
 
 const store = useRelationshipStore()
@@ -39,7 +38,7 @@ function handleSubmit() {
     setTimeout(() => {}, 1200)
   } else {
     shakeError.value = true
-    errorMsg.value = 'Fecha incorrecta 💔 Intenta de nuevo'
+    errorMsg.value = 'Fecha incorrecta. Intenta de nuevo'
     setTimeout(() => {
       shakeError.value = false
       errorMsg.value = ''
@@ -52,11 +51,9 @@ const canSubmit = computed(() => day.value && month.value && year.value.length =
 </script>
 
 <template>
-  <div class="lock-screen" :style="{ backgroundImage: `url(${vintageBg})` }">
-    <!-- Warm overlay -->
-    <div class="overlay"></div>
+  <div class="lock-screen">
 
-    <transition name="fade-up">
+    <transition name="fade-up" appear>
       <div class="card" v-if="!success">
         <!-- Top decorative element -->
         <div class="card-ornament">
@@ -65,10 +62,25 @@ const canSubmit = computed(() => day.value && month.value && year.value.length =
           <span class="ornament-line"></span>
         </div>
 
-        <h1 class="card-title">Santi & Cami</h1>
+        <h1 class="card-title">
+          <span
+            class="name-clickable"
+            :class="{ active: store.currentTheme === 'santi' }"
+            @click="store.setTheme('santi')"
+            title="Toca para activar el estilo de Santi"
+          >Santi</span>
+          <span class="title-ampersand">&</span>
+          <span
+            class="name-clickable"
+            :class="{ active: store.currentTheme === 'cami' }"
+            @click="store.setTheme('cami')"
+            title="Toca para activar el estilo de Cami"
+          >Cami</span>
+        </h1>
         <p class="card-subtitle">
           Para entrar a nuestro espacio especial,<br>
-          introduce la fecha en que todo comenzó. 💛
+          introduce la fecha en que todo comenzó.
+          <Icon icon="mdi:heart" class="subtitle-heart-icon" />
         </p>
 
         <!-- Date input group -->
@@ -162,7 +174,7 @@ const canSubmit = computed(() => day.value && month.value && year.value.length =
   background-size: cover;
   background-position: center;
   position: relative;
-  font-family: 'Playfair Display', 'Georgia', serif;
+  font-family: 'Cause', 'Georgia', serif;
 }
 
 .overlay {
@@ -180,9 +192,9 @@ const canSubmit = computed(() => day.value && month.value && year.value.length =
 .card {
   position: relative;
   z-index: 10;
-  background: rgba(255, 252, 245, 0.88);
+  background: var(--theme-card-bg);
   backdrop-filter: blur(6px);
-  border: 1.5px solid rgba(192, 148, 108, 0.35);
+  border: 1.5px solid var(--theme-card-border);
   border-radius: 4px;
   padding: 3rem 2.75rem;
   max-width: 420px;
@@ -192,6 +204,7 @@ const canSubmit = computed(() => day.value && month.value && year.value.length =
     0 4px 24px rgba(160, 110, 60, 0.12),
     0 1px 4px rgba(160, 110, 60, 0.08),
     inset 0 0 0 8px rgba(192, 148, 108, 0.06);
+  transition: background 0.4s ease, border-color 0.4s ease;
 }
 
 /* ---- Ornaments ---- */
@@ -209,7 +222,7 @@ const canSubmit = computed(() => day.value && month.value && year.value.length =
 .ornament-line {
   flex: 1;
   height: 1px;
-  background: linear-gradient(90deg, transparent, #c0946c, transparent);
+  background: linear-gradient(90deg, transparent, var(--theme-secondary), transparent);
   max-width: 60px;
 }
 .ornament-line.short {
@@ -217,31 +230,65 @@ const canSubmit = computed(() => day.value && month.value && year.value.length =
 }
 .heart {
   font-size: 1.1rem;
-  color: #c0717e;
+  color: var(--theme-primary);
   letter-spacing: 2px;
 }
 .tiny-flowers {
   font-size: 0.75rem;
-  color: #b89070;
+  color: var(--theme-secondary);
   letter-spacing: 3px;
 }
 
 /* ---- Typography ---- */
 .card-title {
-  font-family: 'Playfair Display', 'Georgia', serif;
+  font-family: 'Cause', 'Georgia', serif;
   font-size: 2.6rem;
   font-weight: 700;
-  color: #5c3d2e;
+  color: var(--theme-text-main);
   letter-spacing: 0.04em;
   margin-bottom: 0.6rem;
   line-height: 1.1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
 }
+.title-ampersand {
+  color: var(--theme-secondary);
+  font-size: 2.1rem;
+  font-weight: 400;
+}
+.name-clickable {
+  cursor: pointer;
+  padding: 0.1rem 0.4rem;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  opacity: 0.75;
+}
+.name-clickable:hover {
+  opacity: 1;
+  transform: translateY(-2px);
+}
+.name-clickable.active {
+  opacity: 1;
+  color: var(--theme-primary);
+}
+
 .card-subtitle {
   font-family: 'Lato', system-ui, sans-serif;
   font-size: 0.9rem;
-  color: #8a6550;
+  color: var(--theme-text-body);
   line-height: 1.6;
   margin-bottom: 2rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.2rem;
+}
+.subtitle-heart-icon {
+  font-size: 1rem;
+  color: var(--theme-primary);
+  margin-top: 0.2rem;
 }
 
 /* ---- Date Input ---- */
@@ -269,34 +316,39 @@ const canSubmit = computed(() => day.value && month.value && year.value.length =
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: #a07850;
+  color: var(--theme-text-muted);
 }
 .date-field input {
-  width: 52px;
-  padding: 0.65rem 0.4rem;
+  width: 54px;
+  height: 48px;
+  line-height: 48px;
+  padding: 0;
   text-align: center;
-  font-size: 1.3rem;
-  font-family: 'Playfair Display', 'Georgia', serif;
-  color: #5c3d2e;
-  background: rgba(255, 248, 238, 0.9);
-  border: 1.5px solid rgba(192, 148, 108, 0.5);
+  font-size: 1.25rem;
+  font-family: 'Cause', 'Georgia', serif;
+  color: var(--theme-text-main);
+  background: var(--theme-card-bg);
+  border: 1.5px solid var(--theme-card-border);
   border-radius: 4px;
   outline: none;
   transition: border-color 0.2s, box-shadow 0.2s;
   letter-spacing: 0.05em;
+  box-sizing: border-box;
 }
 .date-field input:focus {
-  border-color: #c0717e;
-  box-shadow: 0 0 0 3px rgba(192, 113, 126, 0.18);
+  border-color: var(--theme-primary);
+  box-shadow: 0 0 0 3px var(--theme-badge-bg);
 }
 .date-field input::placeholder {
-  color: #c9aa8a;
-  font-size: 1rem;
+  color: var(--theme-text-muted);
+  opacity: 0.6;
+  font-size: 1.05rem;
+  line-height: 48px;
 }
 .date-separator {
   font-size: 1.6rem;
-  color: #c0946c;
-  font-family: 'Playfair Display', serif;
+  color: var(--theme-secondary);
+  font-family: 'Cause', serif;
   padding-bottom: 0.35rem;
 }
 
@@ -304,7 +356,7 @@ const canSubmit = computed(() => day.value && month.value && year.value.length =
 .error-msg {
   font-family: 'Lato', system-ui, sans-serif;
   font-size: 0.85rem;
-  color: #c0717e;
+  color: var(--theme-primary);
   margin-top: 0.6rem;
   min-height: 1.2rem;
 }
@@ -314,16 +366,16 @@ const canSubmit = computed(() => day.value && month.value && year.value.length =
   margin-top: 1.5rem;
   width: 100%;
   padding: 0.9rem 1rem;
-  background: linear-gradient(135deg, #c0717e 0%, #a85060 100%);
+  background: var(--theme-btn-gradient);
   color: #fff9f5;
-  font-family: 'Playfair Display', 'Georgia', serif;
+  font-family: 'Cause', 'Georgia', serif;
   font-size: 1rem;
   letter-spacing: 0.04em;
   border: none;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.25s ease;
-  box-shadow: 0 3px 12px rgba(168, 80, 96, 0.3);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -335,7 +387,7 @@ const canSubmit = computed(() => day.value && month.value && year.value.length =
 }
 .btn-unlock:hover:not(:disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(168, 80, 96, 0.4);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
 }
 .btn-unlock:active:not(:disabled) {
   transform: translateY(0);
@@ -358,22 +410,23 @@ const canSubmit = computed(() => day.value && month.value && year.value.length =
 }
 .success-heart {
   font-size: 5rem;
-  color: #c0717e;
+  color: var(--theme-primary);
   animation: heartbeat 0.8s ease infinite;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .success-text {
-  font-family: 'Playfair Display', 'Georgia', serif;
+  font-family: 'Cause', 'Georgia', serif;
   font-size: 1.6rem;
-  color: #5c3d2e;
+  color: var(--theme-text-main);
   letter-spacing: 0.08em;
 }
 
 /* ---- Transitions ---- */
-.fade-up-enter-active {
-  animation: fadeUp 0.6s ease both;
+.fade-up-enter-active,
+.fade-up-appear-active {
+  animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .fade-enter-active, .fade-leave-active {
   transition: opacity 0.5s ease;

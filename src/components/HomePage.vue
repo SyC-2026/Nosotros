@@ -1,11 +1,17 @@
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRelationshipStore } from '../stores/relationship.js'
-import vintageBg from '../assets/vintage_bg.png'
+import { useFrases } from '../composables/useFrases.js'
 import TimerCard from './TimerCard.vue'
+import CountdownTimerCard from './CountdownTimerCard.vue'
 import { Icon } from '@iconify/vue'
 
 const store = useRelationshipStore()
+
+// Dynamic Quotes from Firestore
+const { getRandomFrase } = useFrases()
+// Inicialización sincrónica instantánea (sin parpadeos de texto)
+const currentQuote = ref(getRandomFrase())
 
 // Live day counter (updates every minute)
 const daysCount = ref(store.daysTogther)
@@ -29,16 +35,64 @@ const startDateFormatted = new Intl.DateTimeFormat('es-ES', {
 function handleLock() {
   store.lock()
 }
+
+// --- Dynamic Countdown Target Calculations ---
+// 1. Santi's Birthday: Sept 7 (every year at 00:00:00)
+const nextSantiBday = computed(() => {
+  const now = new Date()
+  let year = now.getFullYear()
+  let target = new Date(year, 8, 7, 0, 0, 0) // Month index 8 = September
+  if (now > target) {
+    target = new Date(year + 1, 8, 7, 0, 0, 0)
+  }
+  return target
+})
+
+// 2. Cami's Birthday: Nov 28 (every year at 00:00:00)
+const nextCamiBday = computed(() => {
+  const now = new Date()
+  let year = now.getFullYear()
+  let target = new Date(year, 10, 28, 0, 0, 0) // Month index 10 = November
+  if (now > target) {
+    target = new Date(year + 1, 10, 28, 0, 0, 0)
+  }
+  return target
+})
+
+// 3. Next Cumple Mes: 14th of every month at 00:00:00
+const nextCumpleMes = computed(() => {
+  const now = new Date()
+  let year = now.getFullYear()
+  let month = now.getMonth()
+  let target = new Date(year, month, 14, 0, 0, 0)
+  if (now > target) {
+    target = new Date(year, month + 1, 14, 0, 0, 0)
+  }
+  return target
+})
 </script>
 
 <template>
-  <div class="home" :style="{ backgroundImage: `url(${vintageBg})` }">
-    <div class="overlay"></div>
+  <div class="home">
 
     <!-- Header -->
     <header class="site-header">
       <div class="header-ornament">✵</div>
-      <h1 class="site-title">Santi & Cami</h1>
+      <h1 class="site-title">
+        <span
+          class="name-clickable"
+          :class="{ active: store.currentTheme === 'santi' }"
+          @click="store.setTheme('santi')"
+          title="Toca para activar el estilo de Santi"
+        >Santi</span>
+        <span class="title-ampersand">&</span>
+        <span
+          class="name-clickable"
+          :class="{ active: store.currentTheme === 'cami' }"
+          @click="store.setTheme('cami')"
+          title="Toca para activar el estilo de Cami"
+        >Cami</span>
+      </h1>
       <div class="header-ornament">✵</div>
     </header>
 
@@ -57,7 +111,7 @@ function handleLock() {
           <span class="ornament-line"></span>
         </div>
         <p class="hero-quote">
-          “Contigo, cada día ordinario se convierte en el favorito de mi vida.”
+          “{{ currentQuote }}”
         </p>
       </section>
 
@@ -84,6 +138,33 @@ function handleLock() {
             label="El día que nos pusimos de novios"
             icon="mdi:heart"
             since="2026-07-14T00:00:00-03:00"
+          />
+        </div>
+      </section>
+
+      <!-- Countdowns Section -->
+      <section class="timers-section">
+        <div class="section-header">
+          <span class="ornament-line long"></span>
+          <h2 class="section-title">Cuentas atrás</h2>
+          <span class="ornament-line long"></span>
+        </div>
+
+        <div class="timers-grid">
+          <CountdownTimerCard
+            label="Próximo cumple mes"
+            icon="mdi:heart-flash"
+            :targetDate="nextCumpleMes"
+          />
+          <CountdownTimerCard
+            label="Cumpleaños de Santi"
+            icon="mdi:cake-variant-outline"
+            :targetDate="nextSantiBday"
+          />
+          <CountdownTimerCard
+            label="Cumpleaños de Cami"
+            icon="mdi:cake-variant-outline"
+            :targetDate="nextCamiBday"
           />
         </div>
       </section>
@@ -167,16 +248,41 @@ function handleLock() {
   text-align: center;
 }
 .site-title {
-  font-family: 'Playfair Display', 'Georgia', serif;
+  font-family: 'Cause', 'Georgia', serif;
   font-size: 2.8rem;
   font-weight: 700;
-  color: #5c3d2e;
+  color: var(--theme-text-main);
   letter-spacing: 0.06em;
   margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+.title-ampersand {
+  color: var(--theme-secondary);
+  font-size: 2.2rem;
+  font-weight: 400;
+}
+.name-clickable {
+  cursor: pointer;
+  padding: 0.1rem 0.5rem;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  opacity: 0.7;
+}
+.name-clickable:hover {
+  opacity: 1;
+  transform: translateY(-2px);
+}
+.name-clickable.active {
+  opacity: 1;
+  color: var(--theme-primary);
+  /* background: var(--theme-badge-bg); */
+  /* box-shadow: inset 0 0 0 1px var(--theme-badge-border); */
 }
 .header-ornament {
   font-size: 1.2rem;
-  color: #c0946c;
+  color: var(--theme-secondary);
 }
 
 /* ---- Main content ---- */
@@ -193,8 +299,8 @@ function handleLock() {
 
 /* ---- Hero card ---- */
 .hero-card {
-  background: rgba(255, 252, 245, 0.85);
-  border: 1.5px solid rgba(192, 148, 108, 0.3);
+  background: var(--theme-card-bg);
+  border: 1.5px solid var(--theme-card-border);
   border-radius: 4px;
   padding: 2.5rem 2rem;
   text-align: center;
@@ -206,7 +312,7 @@ function handleLock() {
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.12em;
-  color: #a07850;
+  color: var(--theme-text-muted);
   margin-bottom: 1.25rem;
 }
 .days-display {
@@ -216,17 +322,17 @@ function handleLock() {
   margin-bottom: 1.5rem;
 }
 .days-number {
-  font-family: 'Playfair Display', 'Georgia', serif;
+  font-family: 'Cause', 'Georgia', serif;
   font-size: clamp(4rem, 15vw, 7rem);
   font-weight: 700;
-  color: #c0717e;
+  color: var(--theme-primary);
   line-height: 1;
   letter-spacing: -0.02em;
 }
 .days-label {
-  font-family: 'Playfair Display', 'Georgia', serif;
+  font-family: 'Cause', 'Georgia', serif;
   font-size: 1.3rem;
-  color: #8a6550;
+  color: var(--theme-text-body);
   letter-spacing: 0.08em;
   margin-top: 0.25rem;
 }
@@ -239,20 +345,20 @@ function handleLock() {
 .ornament-line {
   flex: 1;
   height: 1px;
-  background: linear-gradient(90deg, transparent, #c0946c, transparent);
+  background: linear-gradient(90deg, transparent, var(--theme-secondary), transparent);
 }
 .ornament-line.long {
   max-width: 80px;
 }
 .small-heart {
-  color: #c0717e;
+  color: var(--theme-primary);
   font-size: 0.9rem;
 }
 .hero-quote {
-  font-family: 'Playfair Display', 'Georgia', serif;
+  font-family: 'Cause', 'Georgia', serif;
   font-style: italic;
   font-size: 1.05rem;
-  color: #7a5540;
+  color: var(--theme-text-main);
   line-height: 1.6;
 }
 
@@ -266,6 +372,7 @@ function handleLock() {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 1rem;
+  align-items: stretch;
 }
 
 /* ---- Milestones ---- */
@@ -281,10 +388,10 @@ function handleLock() {
   gap: 1rem;
 }
 .section-title {
-  font-family: 'Playfair Display', 'Georgia', serif;
+  font-family: 'Cause', 'Georgia', serif;
   font-size: 1.35rem;
   font-weight: 600;
-  color: #5c3d2e;
+  color: var(--theme-text-main);
   white-space: nowrap;
   letter-spacing: 0.04em;
 }
@@ -296,8 +403,8 @@ function handleLock() {
 .milestone-card {
   display: flex;
   gap: 1.25rem;
-  background: rgba(255, 252, 245, 0.85);
-  border: 1.5px solid rgba(192, 148, 108, 0.25);
+  background: var(--theme-card-bg);
+  border: 1.5px solid var(--theme-card-border);
   border-radius: 4px;
   padding: 1.25rem 1.5rem;
   box-shadow: 0 2px 10px rgba(160, 110, 60, 0.08);
@@ -316,7 +423,7 @@ function handleLock() {
   line-height: 1;
   flex-shrink: 0;
   margin-top: 0.1rem;
-  color: #c0717e;
+  color: var(--theme-primary);
   display: flex;
   align-items: flex-start;
 }
@@ -329,18 +436,18 @@ function handleLock() {
   font-size: 0.75rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: #a07850;
+  color: var(--theme-text-muted);
 }
 .milestone-title {
-  font-family: 'Playfair Display', 'Georgia', serif;
+  font-family: 'Cause', 'Georgia', serif;
   font-size: 1.05rem;
   font-weight: 600;
-  color: #5c3d2e;
+  color: var(--theme-text-main);
   margin: 0;
 }
 .milestone-desc {
   font-size: 0.9rem;
-  color: #8a6550;
+  color: var(--theme-text-body);
   line-height: 1.5;
   margin: 0;
 }
@@ -349,7 +456,7 @@ function handleLock() {
   align-items: center;
   gap: 0.3rem;
   font-size: 0.875rem;
-  color: #b0907a;
+  color: var(--theme-text-muted);
   font-style: italic;
   margin: 0;
 }
@@ -359,7 +466,7 @@ function handleLock() {
 }
 .footer-heart {
   font-size: 1rem;
-  color: #c0717e;
+  color: var(--theme-primary);
   vertical-align: middle;
   position: relative;
   top: -1px;
@@ -375,7 +482,7 @@ function handleLock() {
   gap: 1rem;
   padding: 1.5rem 2rem;
   font-size: 0.8rem;
-  color: #a07850;
+  color: var(--theme-text-muted);
   letter-spacing: 0.06em;
 }
 .btn-lock {
@@ -383,11 +490,14 @@ function handleLock() {
   border: none;
   cursor: pointer;
   font-size: 1.1rem;
-  color: #c0946c;
+  color: var(--theme-secondary);
   opacity: 0.5;
   transition: opacity 0.2s;
   display: flex;
   align-items: center;
+}
+.btn-lock:hover {
+  opacity: 1;
 }
 .btn-lock:hover {
   opacity: 1;

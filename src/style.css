@@ -1,6 +1,8 @@
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400;1,600&family=Lato:wght@300;400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cause:wght@100..900&family=Lato:wght@300;400;700&display=swap');
 
-*, *::before, *::after {
+*,
+*::before,
+*::after {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
@@ -11,7 +13,8 @@
 }
 
 /* Allow selection only inside text inputs and textareas */
-input, textarea {
+input,
+textarea {
   user-select: text;
   -webkit-user-select: text;
 }
@@ -22,22 +25,96 @@ img {
   draggable: false;
 }
 
-html, body {
+html,
+body {
   min-height: 100vh;
   width: 100%;
   overflow-x: hidden;
 }
 
+:root {
+  /* Cami Theme (Default: Warm Rose & Golden Amber) */
+  --theme-primary: #c0717e;
+  --theme-secondary: #c0946c;
+  --theme-text-main: #5c3d2e;
+  --theme-text-muted: #a07850;
+  --theme-text-body: #8a6550;
+  --theme-card-bg: rgba(255, 252, 245, 0.88);
+  --theme-card-border: rgba(192, 148, 108, 0.3);
+  --theme-bg-gradient: linear-gradient(160deg,
+      rgba(255, 250, 242, 0.88) 0%,
+      rgba(253, 238, 218, 0.82) 60%,
+      rgba(255, 242, 230, 0.88) 100%);
+  --theme-btn-gradient: linear-gradient(135deg, #c0717e 0%, #a85060 100%);
+  --theme-badge-bg: rgba(192, 148, 108, 0.12);
+  --theme-badge-border: rgba(192, 148, 108, 0.3);
+  --theme-drawer-bg: #fdf8f0;
+  --theme-drawer-header-bg: linear-gradient(135deg,
+      rgba(192, 113, 126, 0.12) 0%,
+      rgba(192, 148, 108, 0.08) 100%);
+}
+
+body.theme-santi {
+  /* Santi Theme (Masculine Vintage: Steel Teal & Sky Slate) */
+  --theme-primary: #2b5c68;
+  --theme-secondary: #4b8fb8;
+  --theme-text-main: #1c2d37;
+  --theme-text-muted: #4a6b7c;
+  --theme-text-body: #3d5a6c;
+  --theme-card-bg: rgba(240, 245, 248, 0.90);
+  --theme-card-border: rgba(74, 107, 124, 0.32);
+  --theme-bg-gradient: linear-gradient(160deg,
+      rgba(235, 242, 245, 0.90) 0%,
+      rgba(220, 232, 238, 0.84) 60%,
+      rgba(230, 239, 244, 0.90) 100%);
+  --theme-btn-gradient: linear-gradient(135deg, #2b5c68 0%, #1a3d46 100%);
+  --theme-badge-bg: rgba(74, 107, 124, 0.14);
+  --theme-badge-border: rgba(74, 107, 124, 0.32);
+  --theme-drawer-bg: #f2f6f9;
+  --theme-drawer-header-bg: linear-gradient(135deg,
+      rgba(43, 92, 104, 0.14) 0%,
+      rgba(184, 125, 75, 0.08) 100%);
+}
+
 body {
   font-family: 'Lato', system-ui, -apple-system, sans-serif;
   background-color: #fdf6ec;
-  color: #5c3d2e;
+  color: var(--theme-text-main);
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+  transition: color 0.4s ease, background-color 0.4s ease;
 }
 
 #app {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+}
+
+/* Smooth transition for theme switches */
+.home,
+.camino-page,
+.lock-screen,
+.maintenance-page,
+.drawer,
+.hero-card,
+.milestone-card,
+.timer-card,
+.memory-card {
+  transition: background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease, color 0.4s ease;
+}
+
+/* Hide scrollbar globally while allowing scroll functionality */
+* {
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
+}
+
+*::-webkit-scrollbar {
+  display: none;
+  /* Chrome, Safari, Opera */
+  width: 0;
+  height: 0;
 }

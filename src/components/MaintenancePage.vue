@@ -1,11 +1,9 @@
 <script setup>
 import { Icon } from '@iconify/vue'
-import vintageBg from '../assets/vintage_bg.png'
 </script>
 
 <template>
-  <div class="maintenance-page" :style="{ backgroundImage: `url(${vintageBg})` }">
-    <div class="overlay"></div>
+  <div class="maintenance-page">
 
     <div class="maintenance-card">
 
@@ -178,7 +176,7 @@ import vintageBg from '../assets/vintage_bg.png'
 
 /* ── Typography ───────────────────────────────────────────────────────────── */
 .card-title {
-  font-family: 'Playfair Display', 'Georgia', serif;
+  font-family: 'Cause', 'Georgia', serif;
   font-size: 2.2rem;
   font-weight: 700;
   color: #5c3d2e;

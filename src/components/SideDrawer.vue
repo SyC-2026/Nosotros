@@ -35,9 +35,9 @@ const menuItems = [
             <p class="drawer-since">Desde el 14 de julio de 2026</p>
           </div>
         </div>
-        <button class="btn-close" @click="nav.closeDrawer()" aria-label="Cerrar menú">
+        <!-- <button class="btn-close" @click="nav.closeDrawer()" aria-label="Cerrar menú">
           <Icon icon="mdi:close" />
-        </button>
+        </button> -->
       </div>
 
       <!-- Ornament -->
@@ -81,7 +81,7 @@ const menuItems = [
 .drawer-backdrop {
   position: fixed;
   inset: 0;
-  background: rgba(50, 30, 15, 0.45);
+  background: rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(2px);
   z-index: 100;
 }
@@ -94,12 +94,13 @@ const menuItems = [
   bottom: 0;
   width: 300px;
   z-index: 101;
-  background: #fdf8f0;
-  border-right: 1.5px solid rgba(192, 148, 108, 0.3);
-  box-shadow: 4px 0 32px rgba(120, 70, 30, 0.18);
+  background: var(--theme-drawer-bg);
+  border-right: 1.5px solid var(--theme-card-border);
+  box-shadow: 4px 0 32px rgba(0, 0, 0, 0.14);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: background 0.4s ease;
 }
 
 /* ---- Drawer header ---- */
@@ -108,12 +109,8 @@ const menuItems = [
   align-items: flex-start;
   justify-content: space-between;
   padding: 1.75rem 1.5rem 1.25rem;
-  background: linear-gradient(
-    135deg,
-    rgba(192, 113, 126, 0.12) 0%,
-    rgba(192, 148, 108, 0.08) 100%
-  );
-  border-bottom: 1px solid rgba(192, 148, 108, 0.2);
+  background: var(--theme-drawer-header-bg);
+  border-bottom: 1px solid var(--theme-card-border);
 }
 .drawer-title-group {
   display: flex;
@@ -122,20 +119,20 @@ const menuItems = [
 }
 .drawer-heart-icon {
   font-size: 1.6rem;
-  color: #c0717e;
+  color: var(--theme-primary);
   flex-shrink: 0;
 }
 .drawer-couple {
-  font-family: 'Playfair Display', 'Georgia', serif;
+  font-family: 'Cause', 'Georgia', serif;
   font-size: 1.15rem;
   font-weight: 700;
-  color: #5c3d2e;
+  color: var(--theme-text-main);
   line-height: 1.2;
 }
 .drawer-since {
   font-family: 'Lato', system-ui, sans-serif;
   font-size: 0.72rem;
-  color: #a07850;
+  color: var(--theme-text-muted);
   margin-top: 2px;
   letter-spacing: 0.02em;
 }
@@ -168,11 +165,11 @@ const menuItems = [
 .orn-line {
   flex: 1;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(192, 148, 108, 0.5), transparent);
+  background: linear-gradient(90deg, transparent, var(--theme-secondary), transparent);
 }
 .orn-flower {
   font-size: 0.75rem;
-  color: #c0946c;
+  color: var(--theme-secondary);
   letter-spacing: 4px;
 }
 
@@ -201,39 +198,35 @@ const menuItems = [
   position: relative;
 }
 .nav-item:hover {
-  background: rgba(192, 148, 108, 0.1);
+  background: var(--theme-badge-bg);
   transform: translateX(3px);
 }
 .nav-item.active {
-  background: linear-gradient(
-    135deg,
-    rgba(192, 113, 126, 0.15) 0%,
-    rgba(192, 148, 108, 0.1) 100%
-  );
+  background: var(--theme-drawer-header-bg);
 }
 
 .nav-icon {
   font-size: 1.3rem;
-  color: #a07850;
+  color: var(--theme-text-muted);
   flex-shrink: 0;
   transition: color 0.18s;
 }
 .nav-item.active .nav-icon {
-  color: #c0717e;
+  color: var(--theme-primary);
 }
 
 .nav-label {
-  font-family: 'Playfair Display', 'Georgia', serif;
+  font-family: 'Cause', 'Georgia', serif;
   font-size: 1rem;
   font-weight: 600;
-  color: #5c3d2e;
+  color: var(--theme-text-main);
   flex: 1;
   letter-spacing: 0.02em;
 }
 
 .nav-active-arrow {
   font-size: 1.1rem;
-  color: #c0717e;
+  color: var(--theme-primary);
 }
 
 /* ---- Drawer footer ---- */
@@ -245,13 +238,13 @@ const menuItems = [
   padding: 1.25rem 1.5rem;
   font-family: 'Lato', system-ui, sans-serif;
   font-size: 0.75rem;
-  color: #a07850;
+  color: var(--theme-text-muted);
   letter-spacing: 0.06em;
-  border-top: 1px solid rgba(192, 148, 108, 0.2);
+  border-top: 1px solid var(--theme-card-border);
 }
 .footer-icon {
   font-size: 0.75rem;
-  color: #c0717e;
+  color: var(--theme-primary);
 }
 
 /* ---- Transitions ---- */

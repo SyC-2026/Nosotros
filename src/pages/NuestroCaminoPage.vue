@@ -1,7 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { Icon } from '@iconify/vue'
-import vintageBg from '../assets/vintage_bg.png'
 import { useRecuerdos } from '../composables/useRecuerdos.js'
 
 const { recuerdos, loading, error, addRecuerdo, updateRecuerdo, deleteRecuerdo } = useRecuerdos()
@@ -31,11 +30,34 @@ function toDatetimeLocal(date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
+// ── Carga dinámica de fotos desde src/assets/fotos/ ────────────────────────────
+const fotoModules = import.meta.glob(
+  '../assets/fotos/*.{png,jpg,jpeg,webp,svg,PNG,JPG,JPEG,WEBP,SVG}',
+  { eager: true, import: 'default' }
+)
+
+const fotosMap = computed(() => {
+  const map = {}
+  for (const path in fotoModules) {
+    const filename = path.split('/').pop()
+    map[filename] = fotoModules[path]
+  }
+  return map
+})
+
+const availableFotoNames = computed(() => Object.keys(fotosMap.value))
+
+function getFotoUrl(filename) {
+  if (!filename) return null
+  return fotosMap.value[filename] || null
+}
+
 // ── Modal state ───────────────────────────────────────────────────────────────
 const showModal    = ref(false)
 const editTarget   = ref(null)   // null = new record, object = editing existing
 const formTitulo   = ref('')
 const formDatetime = ref('')
+const formFoto     = ref('')
 const saving       = ref(false)
 const confirmDelete = ref(false)
 
@@ -46,6 +68,7 @@ const modalTitle = computed(() =>
 function openAdd() {
   editTarget.value   = null
   formTitulo.value   = ''
+  formFoto.value     = ''
   // Default to now in local time
   formDatetime.value = toDatetimeLocal(new Date())
   confirmDelete.value = false
@@ -56,6 +79,7 @@ function openEdit(recuerdo) {
   editTarget.value    = recuerdo
   formTitulo.value    = recuerdo.titulo
   formDatetime.value  = toDatetimeLocal(recuerdo.date)
+  formFoto.value      = recuerdo.foto || ''
   confirmDelete.value = false
   showModal.value     = true
 }
@@ -71,9 +95,9 @@ async function handleSave() {
   try {
     const date = new Date(formDatetime.value)
     if (editTarget.value) {
-      await updateRecuerdo(editTarget.value.id, formTitulo.value.trim(), date)
+      await updateRecuerdo(editTarget.value.id, formTitulo.value.trim(), date, formFoto.value)
     } else {
-      await addRecuerdo(formTitulo.value.trim(), date)
+      await addRecuerdo(formTitulo.value.trim(), date, formFoto.value)
     }
     closeModal()
   } catch (e) {
@@ -98,11 +122,20 @@ async function handleDelete() {
     saving.value = false
   }
 }
+
+// ── Lightbox preview state ───────────────────────────────────────────────────
+const previewImage = ref(null)
+
+function openImagePreview(url, title) {
+  previewImage.value = { url, title }
+}
+function closeImagePreview() {
+  previewImage.value = null
+}
 </script>
 
 <template>
-  <div class="camino-page" :style="{ backgroundImage: `url(${vintageBg})` }">
-    <div class="overlay"></div>
+  <div class="camino-page">
 
     <div class="camino-content">
 
@@ -145,32 +178,46 @@ async function handleDelete() {
 
       <!-- Timeline -->
       <div v-else class="timeline">
-        <div v-for="(recuerdo, index) in recuerdos" :key="recuerdo.id" class="timeline-item">
-          <!-- Connector -->
-          <div class="timeline-connector">
-            <div class="connector-dot">
-              <Icon icon="mdi:heart" class="dot-icon" />
-            </div>
-            <div v-if="index < recuerdos.length - 1" class="connector-line"></div>
-          </div>
-
+        <div v-for="recuerdo in recuerdos" :key="recuerdo.id" class="timeline-item">
           <!-- Card -->
           <div class="memory-card">
-            <!-- Date badge -->
+            <!-- Card Header: Title & Edit button -->
+            <div class="card-top">
+              <h3 class="memory-title">{{ recuerdo.titulo }}</h3>
+              <!-- Edit button -->
+              <button class="btn-edit" @click="openEdit(recuerdo)" title="Editar">
+                <Icon icon="mdi:pencil-outline" />
+              </button>
+            </div>
+
+            <!-- Memory photo -->
+            <div
+              v-if="recuerdo.foto && getFotoUrl(recuerdo.foto)"
+              class="memory-photo-box"
+              @click="openImagePreview(getFotoUrl(recuerdo.foto), recuerdo.titulo)"
+              title="Haz clic para ampliar en pantalla completa"
+            >
+              <img
+                :src="getFotoUrl(recuerdo.foto)"
+                :alt="recuerdo.titulo"
+                class="memory-photo"
+                loading="lazy"
+              />
+              <div class="photo-expand-badge">
+                <Icon icon="mdi:arrow-expand-all" />
+              </div>
+            </div>
+
+            <!-- Divider -->
+            <div class="card-divider"><span class="div-line"></span></div>
+
+            <!-- Card Footer: Date badge -->
             <div class="memory-date-badge" v-if="recuerdo.date">
               <Icon icon="mdi:calendar-heart" class="badge-icon" />
               <div class="badge-texts">
                 <span class="badge-day">{{ formatDate(recuerdo.date) }}</span>
                 <span class="badge-time">{{ formatTime(recuerdo.date) }}</span>
               </div>
-            </div>
-            <div class="card-divider"><span class="div-line"></span></div>
-            <div class="card-bottom">
-              <h3 class="memory-title">{{ recuerdo.titulo }}</h3>
-              <!-- Edit button -->
-              <button class="btn-edit" @click="openEdit(recuerdo)" title="Editar">
-                <Icon icon="mdi:pencil-outline" />
-              </button>
             </div>
           </div>
         </div>
@@ -189,7 +236,7 @@ async function handleDelete() {
       <Icon icon="mdi:plus" />
     </button>
 
-    <!-- ── Modal ─────────────────────────────────────────────────────────── -->
+    <!-- ── Modal Form ─────────────────────────────────────────────────────── -->
     <transition name="modal-fade">
       <div v-if="showModal" class="modal-backdrop" @click.self="closeModal">
         <div class="modal-card">
@@ -204,7 +251,7 @@ async function handleDelete() {
 
           <div class="modal-ornament">
             <span class="orn-line"></span>
-            <span style="color:#c0717e;font-size:0.7rem;">♥</span>
+            <span class="modal-heart">♥</span>
             <span class="orn-line"></span>
           </div>
 
@@ -228,6 +275,21 @@ async function handleDelete() {
                 type="datetime-local"
                 class="form-input"
               />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Foto asociable (opcional)</label>
+              <select v-model="formFoto" class="form-select">
+                <option value="">-- Sin foto --</option>
+                <option v-for="name in availableFotoNames" :key="name" :value="name">
+                  📷 {{ name }}
+                </option>
+              </select>
+            </div>
+
+            <!-- Preview selected photo -->
+            <div v-if="formFoto && getFotoUrl(formFoto)" class="form-foto-preview">
+              <img :src="getFotoUrl(formFoto)" :alt="formFoto" />
             </div>
           </div>
 
@@ -265,6 +327,21 @@ async function handleDelete() {
       </div>
     </transition>
 
+    <!-- ── Lightbox Modal Preview (Solo la foto) ───────────────────────── -->
+    <transition name="modal-fade">
+      <div
+        v-if="previewImage"
+        class="lightbox-backdrop"
+        @click="closeImagePreview"
+      >
+        <img
+          :src="previewImage.url"
+          :alt="previewImage.title"
+          class="lightbox-img"
+        />
+      </div>
+    </transition>
+
   </div>
 </template>
 
@@ -272,26 +349,11 @@ async function handleDelete() {
 /* ── Base ─────────────────────────────────────────────────────────────────── */
 .camino-page {
   min-height: 100vh;
-  background-size: cover;
-  background-position: center;
-  background-attachment: fixed;
   display: flex;
   flex-direction: column;
   align-items: center;
   position: relative;
-  font-family: 'Lato', system-ui, sans-serif;
-}
-
-.overlay {
-  position: fixed;
-  inset: 0;
-  background: linear-gradient(
-    160deg,
-    rgba(255, 250, 242, 0.88) 0%,
-    rgba(253, 238, 218, 0.82) 60%,
-    rgba(255, 242, 230, 0.88) 100%
-  );
-  pointer-events: none;
+  font-family: 'Cause', system-ui, sans-serif;
 }
 
 .camino-content {
@@ -315,26 +377,26 @@ async function handleDelete() {
   width: 52px;
   height: 52px;
   border-radius: 12px;
-  background: linear-gradient(135deg, rgba(192, 113, 126, 0.15), rgba(192, 148, 108, 0.12));
-  border: 1.5px solid rgba(192, 148, 108, 0.3);
+  background: var(--theme-badge-bg);
+  border: 1.5px solid var(--theme-card-border);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 1.5rem;
-  color: #c0946c;
+  color: var(--theme-secondary);
   flex-shrink: 0;
 }
 .page-title {
-  font-family: 'Playfair Display', 'Georgia', serif;
+  font-family: 'Cause', 'Georgia', serif;
   font-size: 1.9rem;
   font-weight: 700;
-  color: #5c3d2e;
+  color: var(--theme-text-main);
   margin: 0;
   line-height: 1.15;
 }
 .page-subtitle {
   font-size: 0.85rem;
-  color: #a07850;
+  color: var(--theme-text-muted);
   margin-top: 3px;
 }
 
@@ -347,11 +409,11 @@ async function handleDelete() {
 .orn-line {
   flex: 1;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(192, 148, 108, 0.5), transparent);
+  background: linear-gradient(90deg, transparent, var(--theme-secondary), transparent);
 }
 .orn-flowers {
   font-size: 0.75rem;
-  color: #c0946c;
+  color: var(--theme-secondary);
   letter-spacing: 4px;
 }
 
@@ -362,22 +424,22 @@ async function handleDelete() {
   align-items: center;
   gap: 0.75rem;
   padding: 3rem 2rem;
-  background: rgba(255, 252, 245, 0.85);
-  border: 1.5px solid rgba(192, 148, 108, 0.25);
+  background: var(--theme-card-bg);
+  border: 1.5px solid var(--theme-card-border);
   border-radius: 4px;
   text-align: center;
-  color: #a07850;
+  color: var(--theme-text-muted);
   font-size: 0.9rem;
 }
-.error-state { color: #c0717e; }
+.error-state { color: var(--theme-primary); }
 .spin-icon { font-size: 2rem; animation: spin 1.2s linear infinite; }
-.empty-icon { font-size: 2.5rem; color: #c0946c; opacity: 0.5; }
+.empty-icon { font-size: 2.5rem; color: var(--theme-secondary); opacity: 0.5; }
 .empty-title {
-  font-family: 'Playfair Display', 'Georgia', serif;
+  font-family: 'Cause', 'Georgia', serif;
   font-size: 1.1rem;
-  color: #7a5540;
+  color: var(--theme-text-main);
 }
-.empty-sub { font-size: 0.85rem; color: #b09070; }
+.empty-sub { font-size: 0.85rem; color: var(--theme-text-body); }
 
 /* ── Timeline ─────────────────────────────────────────────────────────────── */
 .timeline {
@@ -400,25 +462,25 @@ async function handleDelete() {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: linear-gradient(135deg, rgba(192, 113, 126, 0.2), rgba(192, 148, 108, 0.15));
-  border: 1.5px solid rgba(192, 113, 126, 0.4);
+  background: var(--theme-badge-bg);
+  border: 1.5px solid var(--theme-card-border);
   display: flex;
   align-items: center;
   justify-content: center;
 }
-.dot-icon { font-size: 0.9rem; color: #c0717e; }
+.dot-icon { font-size: 0.9rem; color: var(--theme-primary); }
 .connector-line {
   width: 1.5px;
   flex: 1;
   min-height: 1.5rem;
-  background: linear-gradient(to bottom, rgba(192, 148, 108, 0.35), rgba(192, 148, 108, 0.1));
+  background: linear-gradient(to bottom, var(--theme-secondary), transparent);
   margin: 0.35rem 0;
 }
 
 .memory-card {
   flex: 1;
-  background: rgba(255, 252, 245, 0.88);
-  border: 1.5px solid rgba(192, 148, 108, 0.25);
+  background: var(--theme-card-bg);
+  border: 1.5px solid var(--theme-card-border);
   border-radius: 4px;
   padding: 1.1rem 1.2rem;
   margin-bottom: 1rem;
@@ -433,43 +495,63 @@ async function handleDelete() {
   opacity: 1;
 }
 
-.memory-date-badge {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-  margin-bottom: 0.65rem;
-}
-.badge-icon { font-size: 1rem; color: #c0946c; margin-top: 2px; flex-shrink: 0; }
-.badge-texts { display: flex; flex-direction: column; }
-.badge-day {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: #a07850;
-  text-transform: capitalize;
-}
-.badge-time { font-size: 0.72rem; color: #b89070; }
-
-.card-divider { margin-bottom: 0.65rem; }
-.div-line {
-  display: block;
-  height: 1px;
-  background: linear-gradient(90deg, rgba(192, 148, 108, 0.4), transparent);
-}
-
-.card-bottom {
+.card-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+  margin-bottom: 0.25rem;
 }
 .memory-title {
-  font-family: 'Playfair Display', 'Georgia', serif;
-  font-size: 1.05rem;
-  font-weight: 600;
-  color: #5c3d2e;
+  font-family: 'Cause', 'Georgia', serif;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--theme-text-main);
   margin: 0;
-  line-height: 1.4;
+  line-height: 1.3;
   flex: 1;
+}
+
+.card-divider {
+  margin-top: 0.85rem;
+  margin-bottom: 0.75rem;
+}
+.div-line {
+  display: block;
+  height: 1px;
+  background: linear-gradient(90deg, var(--theme-secondary), transparent);
+}
+
+.memory-date-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  margin-top: 0.1rem;
+}
+.badge-icon {
+  font-size: 1.85rem;
+  color: var(--theme-secondary);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+.badge-texts {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.badge-day {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--theme-text-muted);
+  line-height: 1.25;
+}
+.badge-time {
+  font-size: 0.75rem;
+  color: var(--theme-text-body);
+  line-height: 1.2;
 }
 
 .btn-edit {
@@ -477,7 +559,7 @@ async function handleDelete() {
   border: none;
   cursor: pointer;
   font-size: 1.05rem;
-  color: #a07850;
+  color: var(--theme-text-muted);
   opacity: 0;
   transition: opacity 0.2s ease, color 0.2s ease;
   display: flex;
@@ -486,7 +568,7 @@ async function handleDelete() {
   border-radius: 4px;
   flex-shrink: 0;
 }
-.btn-edit:hover { color: #c0717e; }
+.btn-edit:hover { color: var(--theme-primary); }
 
 /* ── Counter ──────────────────────────────────────────────────────────────── */
 .recuerdos-counter {
@@ -495,7 +577,7 @@ async function handleDelete() {
   justify-content: center;
   gap: 0.5rem;
   font-size: 0.8rem;
-  color: #a07850;
+  color: var(--theme-text-muted);
   letter-spacing: 0.05em;
   padding: 0.5rem;
 }
@@ -509,7 +591,7 @@ async function handleDelete() {
   width: 52px;
   height: 52px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #c0717e, #a85060);
+  background: var(--theme-btn-gradient);
   border: none;
   color: #fff9f5;
   font-size: 1.6rem;
@@ -517,12 +599,12 @@ async function handleDelete() {
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 4px 18px rgba(168, 80, 96, 0.4);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 .fab:hover {
   transform: scale(1.1) translateY(-2px);
-  box-shadow: 0 8px 24px rgba(168, 80, 96, 0.5);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
 .fab:active { transform: scale(0.96); }
 
@@ -547,13 +629,16 @@ async function handleDelete() {
 }
 
 .modal-card {
-  background: #fdf8f0;
-  border: 1.5px solid rgba(192, 148, 108, 0.3);
+  background: var(--theme-drawer-bg);
+  border: 1.5px solid var(--theme-card-border);
   border-radius: 12px 12px 0 0;
   width: 100%;
   max-width: 480px;
-  box-shadow: 0 -8px 40px rgba(120, 70, 30, 0.2);
+  box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.3);
   overflow: hidden;
+  position: relative;
+  z-index: 310;
+  transition: background 0.4s ease, border-color 0.4s ease;
 }
 
 @media (min-width: 480px) {
@@ -567,10 +652,10 @@ async function handleDelete() {
   padding: 1.5rem 1.5rem 1rem;
 }
 .modal-title {
-  font-family: 'Playfair Display', 'Georgia', serif;
+  font-family: 'Cause', 'Georgia', serif;
   font-size: 1.3rem;
   font-weight: 700;
-  color: #5c3d2e;
+  color: var(--theme-text-main);
   margin: 0;
 }
 .btn-modal-close {
@@ -578,20 +663,24 @@ async function handleDelete() {
   border: none;
   cursor: pointer;
   font-size: 1.2rem;
-  color: #a07850;
+  color: var(--theme-text-muted);
   display: flex;
   align-items: center;
   padding: 4px;
   border-radius: 6px;
   transition: color 0.2s, transform 0.2s;
 }
-.btn-modal-close:hover { color: #c0717e; transform: rotate(90deg); }
+.btn-modal-close:hover { color: var(--theme-primary); transform: rotate(90deg); }
 
 .modal-ornament {
   display: flex;
   align-items: center;
   gap: 0.6rem;
   padding: 0 1.5rem 0.75rem;
+}
+.modal-heart {
+  color: var(--theme-primary);
+  font-size: 0.7rem;
 }
 
 .modal-body {
@@ -607,95 +696,211 @@ async function handleDelete() {
   gap: 0.4rem;
 }
 .form-label {
-  font-family: 'Lato', system-ui, sans-serif;
+  font-family: 'Cause', system-ui, sans-serif;
   font-size: 0.78rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: #a07850;
+  color: var(--theme-text-muted);
   font-weight: 700;
 }
 .form-input {
-  background: rgba(255, 248, 238, 0.9);
-  border: 1.5px solid rgba(192, 148, 108, 0.45);
+  background: var(--theme-card-bg);
+  border: 1.5px solid var(--theme-card-border);
   border-radius: 6px;
   padding: 0.7rem 0.9rem;
   font-size: 0.95rem;
-  font-family: 'Lato', system-ui, sans-serif;
-  color: #5c3d2e;
+  font-family: 'Cause', system-ui, sans-serif;
+  color: var(--theme-text-main);
   outline: none;
   transition: border-color 0.2s, box-shadow 0.2s;
   width: 100%;
 }
 .form-input:focus {
-  border-color: #c0717e;
-  box-shadow: 0 0 0 3px rgba(192, 113, 126, 0.18);
+  border-color: var(--theme-primary);
+  box-shadow: 0 0 0 3px var(--theme-badge-bg);
 }
 
-.modal-actions {
+.form-select {
+  background: var(--theme-card-bg);
+  border: 1.5px solid var(--theme-card-border);
+  border-radius: 6px;
+  padding: 0.7rem 0.9rem;
+  font-size: 0.95rem;
+  font-family: 'Cause', system-ui, sans-serif;
+  color: var(--theme-text-main);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  width: 100%;
+  cursor: pointer;
+}
+.form-select:focus {
+  border-color: var(--theme-primary);
+  box-shadow: 0 0 0 3px var(--theme-badge-bg);
+}
+
+.form-foto-preview {
+  margin-top: 0.4rem;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1.5px solid var(--theme-card-border);
+  max-height: 160px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0.75rem 1.5rem 1.5rem;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.05);
+}
+.form-foto-preview img {
+  width: 100%;
+  height: 160px;
+  object-fit: cover;
+}
+
+/* ── Memory Photo in Timeline Card ── */
+.memory-photo-box {
+  margin-top: 0.85rem;
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1.5px solid var(--theme-card-border);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08);
+  background: rgba(0, 0, 0, 0.03);
+  position: relative;
+  cursor: pointer;
+}
+.memory-photo {
+  width: 100%;
+  max-height: 320px;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.3s ease;
+}
+.memory-card:hover .memory-photo {
+  transform: scale(1.02);
+}
+.photo-expand-badge {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  background: rgba(0, 0, 0, 0.55);
+  color: #ffffff;
+  border-radius: 6px;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  opacity: 0;
+  transition: opacity 0.22s ease, background 0.22s ease;
+  backdrop-filter: blur(4px);
+}
+.memory-photo-box:hover .photo-expand-badge {
+  opacity: 1;
+}
+
+/* ── Lightbox Modal ── */
+.lightbox-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  background: rgba(15, 10, 5, 0.92);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  cursor: pointer;
+}
+
+.lightbox-img {
+  max-width: 92vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7);
+  border: 2px solid var(--theme-card-border);
+  transition: transform 0.25s ease;
+}
+.lightbox-backdrop:hover .lightbox-img {
+  transform: scale(1.01);
+}
+
+/* ── Modal Actions Layout Fix ── */
+.modal-actions {
+  display: flex;
+  flex-direction: column;
   gap: 0.75rem;
-  flex-wrap: wrap;
+  padding: 0.75rem 1.5rem 1.5rem;
 }
 .actions-right {
   display: flex;
-  gap: 0.6rem;
-  margin-left: auto;
+  gap: 0.65rem;
+  width: 100%;
 }
 
 .btn-cancel {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
   background: none;
-  border: 1.5px solid rgba(192, 148, 108, 0.4);
+  border: 1.5px solid var(--theme-card-border);
   border-radius: 6px;
-  padding: 0.6rem 1.1rem;
-  font-family: 'Lato', system-ui, sans-serif;
+  padding: 0.65rem 1.1rem;
+  font-family: 'Cause', system-ui, sans-serif;
   font-size: 0.875rem;
-  color: #8a6550;
+  color: var(--theme-text-body);
   cursor: pointer;
   transition: background 0.2s;
 }
-.btn-cancel:hover { background: rgba(192, 148, 108, 0.08); }
+.btn-cancel:hover { background: var(--theme-badge-bg); }
 
 .btn-save {
+  flex: 1.2;
   display: flex;
   align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  min-width: 130px;
   gap: 0.4rem;
-  background: linear-gradient(135deg, #c0717e, #a85060);
+  background: var(--theme-btn-gradient);
   border: none;
   border-radius: 6px;
-  padding: 0.6rem 1.2rem;
-  font-family: 'Lato', system-ui, sans-serif;
+  padding: 0.65rem 1.2rem;
+  font-family: 'Cause', system-ui, sans-serif;
   font-size: 0.875rem;
   font-weight: 700;
   color: #fff9f5;
   cursor: pointer;
   transition: opacity 0.2s, transform 0.2s;
-  box-shadow: 0 3px 10px rgba(168, 80, 96, 0.3);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
 }
 .btn-save:hover:not(:disabled) { transform: translateY(-1px); opacity: 0.92; }
 .btn-save:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .btn-delete {
+  width: 100%;
   display: flex;
   align-items: center;
+  justify-content: center;
+  white-space: nowrap;
   gap: 0.4rem;
   background: none;
-  border: 1.5px solid rgba(192, 113, 126, 0.35);
+  border: 1.5px solid var(--theme-primary);
   border-radius: 6px;
-  padding: 0.6rem 0.9rem;
-  font-family: 'Lato', system-ui, sans-serif;
+  padding: 0.65rem 0.9rem;
+  font-family: 'Cause', system-ui, sans-serif;
   font-size: 0.85rem;
-  color: #c0717e;
+  color: var(--theme-primary);
   cursor: pointer;
-  transition: background 0.2s, border-color 0.2s;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
 }
-.btn-delete:hover { background: rgba(192, 113, 126, 0.08); }
+.btn-delete:hover { background: var(--theme-badge-bg); }
 .btn-delete.confirm {
-  background: #c0717e;
+  background: var(--theme-primary);
   color: #fff9f5;
-  border-color: #c0717e;
+  border-color: var(--theme-primary);
   animation: shake 0.4s ease;
 }
 

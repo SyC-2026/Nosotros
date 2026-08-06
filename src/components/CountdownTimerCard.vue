@@ -4,13 +4,9 @@ import { Icon } from '@iconify/vue'
 
 const props = defineProps({
   label: { type: String, required: true },
-  icon: { type: String, default: 'mdi:heart' },
-  // ISO string con timezone Argentina (-03:00)
-  since: { type: String, required: true }
+  icon: { type: String, default: 'mdi:cake-variant' },
+  targetDate: { type: [Date, String], required: true }
 })
-
-// Parsear la fecha de referencia
-const sinceDate = new Date(props.since)
 
 const days    = ref(0)
 const hours   = ref(0)
@@ -19,7 +15,8 @@ const seconds = ref(0)
 
 function update() {
   const now  = new Date()
-  const diff = Math.max(0, now - sinceDate) // ms
+  const target = new Date(props.targetDate)
+  const diff = Math.max(0, target - now) // ms remaining
 
   const totalSeconds = Math.floor(diff / 1000)
   days.value    = Math.floor(totalSeconds / 86400)
@@ -35,7 +32,6 @@ onMounted(() => {
 })
 onUnmounted(() => clearInterval(timer))
 
-// Pad to 2 digits
 const pad = (n) => String(n).padStart(2, '0')
 </script>
 

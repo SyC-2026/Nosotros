@@ -43,17 +43,19 @@ export function useRecuerdos() {
 
   // ── CRUD ──────────────────────────────────────────────────────────────────
 
-  async function addRecuerdo(titulo, date) {
+  async function addRecuerdo(titulo, date, foto = '') {
     await addDoc(collection(db, 'recuerdos'), {
       titulo,
-      timestamp: Timestamp.fromDate(date)
+      timestamp: Timestamp.fromDate(date),
+      foto: foto || ''
     })
   }
 
-  async function updateRecuerdo(id, titulo, date) {
+  async function updateRecuerdo(id, titulo, date, foto = '') {
     await updateDoc(doc(db, 'recuerdos', id), {
       titulo,
-      timestamp: Timestamp.fromDate(date)
+      timestamp: Timestamp.fromDate(date),
+      foto: foto || ''
     })
   }
 
