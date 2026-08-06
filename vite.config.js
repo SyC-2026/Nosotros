@@ -8,24 +8,70 @@ export default defineConfig({
     vue(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'masked-icon.svg'],
+      injectRegister: 'auto',
+      includeAssets: [
+        'favicon.ico',
+        'favicon-16x16.png',
+        'favicon-32x32.png',
+        'apple-touch-icon.png',
+        'android-chrome-192x192.png',
+        'android-chrome-512x512.png',
+        'screenshot-desktop.png',
+        'screenshot-mobile.png'
+      ],
+      devOptions: {
+        enabled: true
+      },
       manifest: {
+        id: '/Nosotros/',
         name: 'Santi & Cami',
         short_name: 'SyC',
         description: 'Nuestro espacio especial',
         theme_color: '#ffffff',
         background_color: '#ffffff',
-        display: 'standalone', // Hace que abra como app nativa sin barra de navegador
+        display: 'standalone',
+        start_url: './',
+        protocol_handlers: [
+          {
+            protocol: 'web+syc',
+            url: './?action=%s'
+          }
+        ],
+        scope: './',
         icons: [
           {
-            src: 'pwa-192x192.png',
+            src: 'android-chrome-192x192.png',
             sizes: '192x192',
-            type: 'image/png'
+            type: 'image/png',
+            purpose: 'any'
           },
           {
-            src: 'pwa-512x512.png',
+            src: 'android-chrome-512x512.png',
             sizes: '512x512',
-            type: 'image/png'
+            type: 'image/png',
+            purpose: 'any'
+          },
+          {
+            src: 'android-chrome-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'maskable'
+          }
+        ],
+        screenshots: [
+          {
+            src: 'screenshot-desktop.png',
+            sizes: '1024x1024',
+            type: 'image/png',
+            form_factor: 'wide',
+            label: 'Pantalla principal en escritorio'
+          },
+          {
+            src: 'screenshot-mobile.png',
+            sizes: '1024x1024',
+            type: 'image/png',
+            form_factor: 'narrow',
+            label: 'Pantalla principal en celular'
           }
         ]
       }
@@ -35,6 +81,37 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src')
+    }
+  },
+  server: {
+    watch: {
+      // En Windows el watcher nativo falla con EBUSY cuando se copia un archivo
+      // mientras otro proceso lo tiene bloqueado. El polling evita ese crash.
+      usePolling: true,
+      interval: 500,
+      // Esperar a que el archivo termine de escribirse antes de disparar HMR
+      awaitWriteFinish: {
+        stabilityThreshold: 500,
+        pollInterval: 100
+      }
+    }
+  },
+  build: {
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/firebase')) {
+            return 'vendor-firebase'
+          }
+          if (id.includes('node_modules/@iconify')) {
+            return 'vendor-iconify'
+          }
+          if (id.includes('node_modules/vue') || id.includes('node_modules/pinia')) {
+            return 'vendor-vue'
+          }
+        }
+      }
     }
   }
 })

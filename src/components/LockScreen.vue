@@ -86,8 +86,11 @@ const canSubmit = computed(() => day.value && month.value && year.value.length =
         <!-- Date input group -->
         <div class="date-group" :class="{ shake: shakeError }">
           <div class="date-field">
-            <label>Día</label>
+            <label for="lock-day">Día</label>
             <input
+              id="lock-day"
+              name="lock-day"
+              aria-label="Día"
               ref="dayRef"
               v-model="day"
               type="text"
@@ -100,8 +103,11 @@ const canSubmit = computed(() => day.value && month.value && year.value.length =
           </div>
           <div class="date-separator">/</div>
           <div class="date-field">
-            <label>Mes</label>
+            <label for="lock-month">Mes</label>
             <input
+              id="lock-month"
+              name="lock-month"
+              aria-label="Mes"
               ref="monthRef"
               v-model="month"
               type="text"
@@ -114,8 +120,11 @@ const canSubmit = computed(() => day.value && month.value && year.value.length =
           </div>
           <div class="date-separator">/</div>
           <div class="date-field year-field">
-            <label>Año</label>
+            <label for="lock-year">Año</label>
             <input
+              id="lock-year"
+              name="lock-year"
+              aria-label="Año"
               ref="yearRef"
               v-model="year"
               type="text"

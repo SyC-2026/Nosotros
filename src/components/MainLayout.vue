@@ -5,14 +5,18 @@ import { useNavigationStore } from '../stores/navigation.js'
 import SideDrawer from './SideDrawer.vue'
 import HomePage from './HomePage.vue'
 import NuestroCaminoPage from '../pages/NuestroCaminoPage.vue'
+import LugaresVisitadosPage from '../pages/LugaresVisitadosPage.vue'
+import CartasPage from '../pages/CartasPage.vue'
 
 const nav = useNavigationStore()
 
 const currentComponent = computed(() => {
   switch (nav.currentPage) {
-    case 'home':   return HomePage
-    case 'camino': return NuestroCaminoPage
-    default:       return HomePage
+    case 'home':    return HomePage
+    case 'camino':  return NuestroCaminoPage
+    case 'lugares': return LugaresVisitadosPage
+    case 'cartas':  return CartasPage
+    default:        return HomePage
   }
 })
 </script>

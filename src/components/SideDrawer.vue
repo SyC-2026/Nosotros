@@ -7,8 +7,10 @@ const nav = useNavigationStore()
 const rel = useRelationshipStore()
 
 const menuItems = [
-  { id: 'home',     label: 'Inicio',         icon: 'boxicons:home-heart' },
-  { id: 'camino',   label: 'Nuestro camino',  icon: 'mdi:timeline-outline' },
+  { id: 'home',     label: 'Inicio',            icon: 'boxicons:home-heart' },
+  { id: 'camino',   label: 'Nuestro camino',     icon: 'mdi:timeline-outline' },
+  { id: 'lugares',  label: 'Lugares visitados',  icon: 'mdi:map-marker-path' },
+  { id: 'cartas',   label: 'Cartas',             icon: 'mdi:email-heart-outline' },
 ]
 </script>
 

@@ -89,6 +89,17 @@ function closeModal() {
   confirmDelete.value = false
 }
 
+let isBackdropMouseDown = false
+function handleBackdropMouseDown(e) {
+  isBackdropMouseDown = (e.target === e.currentTarget)
+}
+function handleBackdropClick(e) {
+  if (isBackdropMouseDown && e.target === e.currentTarget) {
+    closeModal()
+  }
+  isBackdropMouseDown = false
+}
+
 async function handleSave() {
   if (!formTitulo.value.trim() || !formDatetime.value) return
   saving.value = true
@@ -107,19 +118,20 @@ async function handleSave() {
   }
 }
 
-async function handleDelete() {
-  if (!confirmDelete.value) {
-    confirmDelete.value = true
-    return
-  }
-  saving.value = true
-  try {
-    await deleteRecuerdo(editTarget.value.id)
-    closeModal()
-  } catch (e) {
-    console.error(e)
-  } finally {
-    saving.value = false
+const deletingRecuerdoId = ref(null)
+let deleteRecuerdoTimeout = null
+
+async function handleCardDelete(recuerdo) {
+  if (deletingRecuerdoId.value === recuerdo.id) {
+    clearTimeout(deleteRecuerdoTimeout)
+    deletingRecuerdoId.value = null
+    await deleteRecuerdo(recuerdo.id)
+  } else {
+    deletingRecuerdoId.value = recuerdo.id
+    clearTimeout(deleteRecuerdoTimeout)
+    deleteRecuerdoTimeout = setTimeout(() => {
+      deletingRecuerdoId.value = null
+    }, 3000)
   }
 }
 
@@ -184,10 +196,19 @@ function closeImagePreview() {
             <!-- Card Header: Title & Edit button -->
             <div class="card-top">
               <h3 class="memory-title">{{ recuerdo.titulo }}</h3>
-              <!-- Edit button -->
-              <button class="btn-edit" @click="openEdit(recuerdo)" title="Editar">
-                <Icon icon="mdi:pencil-outline" />
-              </button>
+              <div class="card-actions">
+                <button class="btn-card-action" @click="openEdit(recuerdo)" title="Editar recuerdo">
+                  <Icon icon="mdi:pencil-outline" />
+                </button>
+                <button
+                  class="btn-card-action btn-card-delete"
+                  :class="{ confirm: deletingRecuerdoId === recuerdo.id }"
+                  @click="handleCardDelete(recuerdo)"
+                  :title="deletingRecuerdoId === recuerdo.id ? 'Presiona de nuevo para confirmar eliminación' : 'Eliminar recuerdo'"
+                >
+                  <Icon :icon="deletingRecuerdoId === recuerdo.id ? 'mdi:alert-circle' : 'mdi:trash-can-outline'" />
+                </button>
+              </div>
             </div>
 
             <!-- Memory photo -->
@@ -238,7 +259,12 @@ function closeImagePreview() {
 
     <!-- ── Modal Form ─────────────────────────────────────────────────────── -->
     <transition name="modal-fade">
-      <div v-if="showModal" class="modal-backdrop" @click.self="closeModal">
+      <div
+        v-if="showModal"
+        class="modal-backdrop"
+        @mousedown="handleBackdropMouseDown"
+        @click="handleBackdropClick"
+      >
         <div class="modal-card">
 
           <!-- Modal header -->
@@ -295,18 +321,6 @@ function closeImagePreview() {
 
           <!-- Actions -->
           <div class="modal-actions">
-            <!-- Delete (only when editing) -->
-            <button
-              v-if="editTarget"
-              class="btn-delete"
-              :class="{ confirm: confirmDelete }"
-              @click="handleDelete"
-              :disabled="saving"
-            >
-              <Icon :icon="confirmDelete ? 'mdi:alert' : 'mdi:trash-can-outline'" />
-              {{ confirmDelete ? '¿Confirmar eliminación?' : 'Eliminar' }}
-            </button>
-
             <div class="actions-right">
               <button class="btn-cancel" @click="closeModal" :disabled="saving">
                 Cancelar
@@ -497,10 +511,39 @@ function closeImagePreview() {
 
 .card-top {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 0.5rem;
   margin-bottom: 0.25rem;
+}
+.card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+.btn-card-action {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.15rem;
+  color: var(--theme-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 4px;
+  transition: color 0.2s ease, background 0.2s ease, transform 0.15s ease;
+}
+.btn-card-action:hover {
+  color: var(--theme-primary);
+  background: var(--theme-badge-bg);
+}
+.btn-card-delete:hover {
+  color: #e53e3e;
+}
+.btn-card-delete.confirm {
+  color: #e53e3e;
+  background: rgba(229, 62, 62, 0.15);
 }
 .memory-title {
   font-family: 'Cause', 'Georgia', serif;

@@ -1,5 +1,8 @@
 <script setup>
 import { Icon } from '@iconify/vue'
+import { useRelationshipStore } from '../stores/relationship.js'
+
+const rel = useRelationshipStore()
 </script>
 
 <template>
@@ -42,9 +45,13 @@ import { Icon } from '@iconify/vue'
       </div>
 
       <!-- Footer -->
-      <div class="card-footer">
+      <div
+        class="card-footer"
+        @click="rel.setTheme(rel.currentTheme === 'santi' ? 'cami' : 'santi')"
+        title="Haz clic para cambiar de estilo (Cami / Santi)"
+      >
         <Icon icon="mdi:heart" class="footer-heart" />
-        <span>Santi & Cami · {{ new Date().getFullYear() }}</span>
+        <span>{{ rel.coupleNames }} · {{ new Date().getFullYear() }}</span>
         <Icon icon="mdi:heart" class="footer-heart" />
       </div>
 
@@ -68,37 +75,24 @@ import { Icon } from '@iconify/vue'
   font-family: 'Lato', system-ui, sans-serif;
 }
 
-.overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    135deg,
-    rgba(255, 248, 240, 0.85) 0%,
-    rgba(253, 235, 213, 0.80) 50%,
-    rgba(255, 240, 228, 0.85) 100%
-  );
-}
-
 /* ── Card ─────────────────────────────────────────────────────────────────── */
 .maintenance-card {
   position: relative;
   z-index: 10;
   max-width: 420px;
   width: 100%;
-  background: rgba(255, 252, 245, 0.88);
+  background: var(--theme-card-bg);
   backdrop-filter: blur(6px);
-  border: 1.5px solid rgba(192, 148, 108, 0.35);
+  border: 1.5px solid var(--theme-card-border);
   border-radius: 4px;
   padding: 2.75rem 2.5rem;
   text-align: center;
-  box-shadow:
-    0 4px 28px rgba(160, 110, 60, 0.12),
-    0 1px 4px rgba(160, 110, 60, 0.08),
-    inset 0 0 0 8px rgba(192, 148, 108, 0.05);
+  box-shadow: 0 4px 28px rgba(0, 0, 0, 0.12);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 1.1rem;
+  transition: background 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
 }
 
 /* ── Ornaments ────────────────────────────────────────────────────────────── */
@@ -112,11 +106,11 @@ import { Icon } from '@iconify/vue'
 .orn-line {
   flex: 1;
   height: 1px;
-  background: linear-gradient(90deg, transparent, #c0946c, transparent);
+  background: linear-gradient(90deg, transparent, var(--theme-secondary), transparent);
 }
 .orn-line.short { max-width: 50px; }
-.orn-heart  { font-size: 0.85rem; color: #c0717e; }
-.orn-flowers { font-size: 0.72rem; color: #b89070; letter-spacing: 4px; }
+.orn-heart  { font-size: 0.85rem; color: var(--theme-primary); }
+.orn-flowers { font-size: 0.72rem; color: var(--theme-secondary); letter-spacing: 4px; }
 
 /* ── Icon wrapper ─────────────────────────────────────────────────────────── */
 .icon-wrapper {
@@ -124,12 +118,8 @@ import { Icon } from '@iconify/vue'
   width: 72px;
   height: 72px;
   border-radius: 16px;
-  background: linear-gradient(
-    135deg,
-    rgba(192, 148, 108, 0.18),
-    rgba(192, 113, 126, 0.12)
-  );
-  border: 1.5px solid rgba(192, 148, 108, 0.4);
+  background: var(--theme-badge-bg);
+  border: 1.5px solid var(--theme-badge-border);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -138,14 +128,14 @@ import { Icon } from '@iconify/vue'
   position: absolute;
   inset: -4px;
   border-radius: 20px;
-  background: linear-gradient(135deg, #c0946c, #c0717e);
-  opacity: 0.2;
+  background: var(--theme-btn-gradient);
+  opacity: 0.25;
   filter: blur(8px);
   animation: glow-pulse 3s ease-in-out infinite;
 }
 .maintenance-icon {
   font-size: 2rem;
-  color: #a07850;
+  color: var(--theme-primary);
   position: relative;
   z-index: 2;
   animation: float 4s ease-in-out infinite;
@@ -158,9 +148,9 @@ import { Icon } from '@iconify/vue'
   gap: 8px;
   padding: 5px 14px;
   border-radius: 9999px;
-  background: rgba(192, 148, 108, 0.12);
-  border: 1px solid rgba(192, 148, 108, 0.3);
-  color: #a07850;
+  background: var(--theme-badge-bg);
+  border: 1px solid var(--theme-badge-border);
+  color: var(--theme-text-muted);
   font-size: 0.8rem;
   font-weight: 600;
   letter-spacing: 0.05em;
@@ -169,8 +159,8 @@ import { Icon } from '@iconify/vue'
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: #c0946c;
-  box-shadow: 0 0 6px #c0946c;
+  background: var(--theme-primary);
+  box-shadow: 0 0 6px var(--theme-primary);
   animation: blink 2s ease-in-out infinite;
 }
 
@@ -179,14 +169,14 @@ import { Icon } from '@iconify/vue'
   font-family: 'Cause', 'Georgia', serif;
   font-size: 2.2rem;
   font-weight: 700;
-  color: #5c3d2e;
+  color: var(--theme-text-main);
   letter-spacing: 0.02em;
   line-height: 1.15;
   margin: 0;
 }
 .card-subtitle {
   font-size: 0.9rem;
-  color: #8a6550;
+  color: var(--theme-text-body);
   line-height: 1.65;
   max-width: 320px;
   margin: 0 auto;
@@ -198,32 +188,31 @@ import { Icon } from '@iconify/vue'
   align-items: center;
   gap: 0.5rem;
   font-size: 0.78rem;
-  color: #a07850;
+  color: var(--theme-text-muted);
   letter-spacing: 0.05em;
-  margin-top: 0.25rem;
+  cursor: pointer;
+  user-select: none;
+  transition: color 0.2s;
+}
+.card-footer:hover {
+  color: var(--theme-primary);
 }
 .footer-heart {
   font-size: 0.75rem;
-  color: #c0717e;
+  color: var(--theme-primary);
 }
 
-/* ── Keyframes ────────────────────────────────────────────────────────────── */
+/* ── Animations ───────────────────────────────────────────────────────────── */
 @keyframes float {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  50%       { transform: translateY(-5px) rotate(8deg); }
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
 }
 @keyframes glow-pulse {
-  0%, 100% { opacity: 0.15; transform: scale(1); }
-  50%       { opacity: 0.35; transform: scale(1.06); }
+  0%, 100% { opacity: 0.2; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(1.05); }
 }
 @keyframes blink {
   0%, 100% { opacity: 1; }
-  50%       { opacity: 0.35; }
-}
-
-/* ── Responsive ───────────────────────────────────────────────────────────── */
-@media (max-width: 480px) {
-  .maintenance-card { padding: 2rem 1.5rem; }
-  .card-title { font-size: 1.75rem; }
+  50% { opacity: 0.3; }
 }
 </style>
