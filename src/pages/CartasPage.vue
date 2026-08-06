@@ -3,6 +3,7 @@ import { ref, computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useCartas } from '../composables/useCartas.js'
 import { useRelationshipStore } from '../stores/relationship.js'
+import BackButton from '../components/BackButton.vue'
 
 const { cartas, loading, error, addCarta, updateCarta, deleteCarta } = useCartas()
 const rel = useRelationshipStore()
@@ -114,6 +115,7 @@ async function handleSave() {
 
 <template>
   <div class="cartas-page">
+    <BackButton />
     <div class="cartas-content">
 
       <!-- Page Header -->
@@ -135,7 +137,7 @@ async function handleSave() {
       </div>
 
       <!-- Loading -->
-      <div v-if="loading" class="state-box">
+      <div v-if="false" class="state-box">
         <Icon icon="mdi:loading" class="spin-icon" />
         <p>Cargando cartas...</p>
       </div>
@@ -621,7 +623,7 @@ async function handleSave() {
   z-index: 50;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
-.fab:hover { transform: scale(1.09); box-shadow: 0 6px 24px rgba(160, 110, 60, 0.45); }
+.fab:hover { filter: brightness(1.08); box-shadow: 0 6px 24px rgba(160, 110, 60, 0.45); }
 
 /* Modal */
 .modal-backdrop {

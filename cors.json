@@ -1,0 +1,21 @@
+[
+    {
+        "origin": [
+            "http://localhost:5173",
+            "https://syc-2026.github.io"
+        ],
+        "method": [
+            "GET",
+            "POST",
+            "PUT",
+            "DELETE",
+            "HEAD"
+        ],
+        "maxAgeSeconds": 3600,
+        "responseHeader": [
+            "Content-Type",
+            "Authorization",
+            "x-goog-resumable"
+        ]
+    }
+]

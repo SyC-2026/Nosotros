@@ -1,11 +1,14 @@
 <script setup>
-import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { Icon } from '@iconify/vue'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { useLugares } from '../composables/useLugares.js'
+import { useMomentos } from '../composables/useMomentos.js'
+import BackButton from '../components/BackButton.vue'
 
 const { lugares, loading, error, addLugar, updateLugar, deleteLugar } = useLugares()
+const { momentos } = useMomentos()
 
 // ── Date Formatter ────────────────────────────────────────────────────────────
 const dateFormatter = new Intl.DateTimeFormat('es-ES', {
@@ -23,7 +26,7 @@ function toDateOnly(date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
 }
 
-// ── Carga dinámica de fotos desde src/assets/fotos/ ────────────────────────────
+// ── Carga dinámica de fotos desde src/assets/fotos/ y Firestore ─────────────────
 const fotoModules = import.meta.glob(
   '../assets/fotos/*.{png,jpg,jpeg,webp,svg,PNG,JPG,JPEG,WEBP,SVG}',
   { eager: true, import: 'default' }
@@ -37,8 +40,26 @@ const fotosMap = computed(() => {
   return map
 })
 const availableFotoNames = computed(() => Object.keys(fotosMap.value))
+
+const availableFotoOptions = computed(() => {
+  const localList = availableFotoNames.value.map((name) => ({
+    value: name,
+    label: name
+  }))
+
+  const dbList = momentos.value.map((m, index) => ({
+    value: m.url,
+    label: m.title || `Foto ${index + 1}`
+  }))
+
+  return [...localList, ...dbList]
+})
+
 function getFotoUrl(filename) {
   if (!filename) return null
+  if (filename.startsWith('http') || filename.startsWith('data:')) {
+    return filename
+  }
   return fotosMap.value[filename] || null
 }
 
@@ -47,6 +68,12 @@ const mapContainer = ref(null)
 let mapInstance = null
 let markerGroup = null
 const selectedLugarId = ref(null)
+
+function refreshMapSize() {
+  nextTick(() => {
+    mapInstance?.invalidateSize({ animate: false })
+  })
+}
 
 function initMap() {
   if (mapInstance || !mapContainer.value) return
@@ -142,8 +169,17 @@ onMounted(() => {
   nextTick(() => {
     setTimeout(() => {
       initMap()
+      refreshMapSize()
     }, 200)
   })
+  window.addEventListener('resize', refreshMapSize)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', refreshMapSize)
+  mapInstance?.remove()
+  mapInstance = null
+  markerGroup = null
 })
 
 // ── Modal State ───────────────────────────────────────────────────────────────
@@ -338,6 +374,7 @@ function closeGeoResults() {
 
 <template>
   <div class="lugares-page">
+    <BackButton />
     <div class="lugares-content">
 
       <!-- Page Header -->
@@ -520,26 +557,27 @@ function closeGeoResults() {
               <p class="geo-hint">Busca y seleccioná un resultado para autocompletar coordenadas y nombre 📍</p>
             </div>
 
-            <div class="form-group">
-              <label class="form-label">Título de la salida / evento</label>
-              <input
-                v-model="formTitulo"
-                type="text"
-                class="form-input"
-                placeholder="Ej: Primera cita, Paseo al atardecer, Cena de aniversario..."
-                @keyup.enter="handleSave"
-              />
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Nombre del lugar (subtítulo)</label>
-              <input
-                v-model="formLugar"
-                type="text"
-                class="form-input"
-                placeholder="Ej: Puerto Madero, Jardín Japonés, Café San Telmo..."
-                @keyup.enter="handleSave"
-              />
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Título de la salida</label>
+                <input
+                  v-model="formTitulo"
+                  type="text"
+                  class="form-input"
+                  placeholder="Ej: Primera cita, Paseo atardecer..."
+                  @keyup.enter="handleSave"
+                />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Nombre del lugar</label>
+                <input
+                  v-model="formLugar"
+                  type="text"
+                  class="form-input"
+                  placeholder="Ej: Puerto Madero, San Telmo..."
+                  @keyup.enter="handleSave"
+                />
+              </div>
             </div>
 
             <div class="form-row">
@@ -564,19 +602,20 @@ function closeGeoResults() {
               ></textarea>
             </div>
 
-            <div class="form-group">
-              <label class="form-label">Fecha del paseo</label>
-              <input v-model="formDatetime" type="date" class="form-input" />
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Foto asociable (opcional)</label>
-              <select v-model="formFoto" class="form-select">
-                <option value="">-- Sin foto --</option>
-                <option v-for="name in availableFotoNames" :key="name" :value="name">
-                  📷 {{ name }}
-                </option>
-              </select>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">Fecha del paseo</label>
+                <input v-model="formDatetime" type="date" class="form-input" />
+              </div>
+              <div class="form-group">
+                <label class="form-label">Foto asociable (opcional)</label>
+                <select v-model="formFoto" class="form-select">
+                  <option value="">-- Sin foto --</option>
+                  <option v-for="foto in availableFotoOptions" :key="foto.value" :value="foto.value">
+                    {{ foto.label }}
+                  </option>
+                </select>
+              </div>
             </div>
 
             <!-- Preview selected photo -->
@@ -750,10 +789,23 @@ function closeGeoResults() {
   min-height: 0;
 }
 @media (max-width: 900px) {
+  .lugares-page {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+  .lugares-content {
+    flex: none;
+    overflow: visible;
+  }
   .lugares-layout {
     grid-template-columns: 1fr;
-    overflow-y: auto;
+    flex: none;
+    overflow: visible;
   }
+  .map-card { height: 320px; min-height: 320px; }
+  .places-map { flex: 1 1 auto; min-height: 0; }
+  .places-list { height: auto; overflow: visible; }
 }
 
 /* Map Card */
@@ -941,7 +993,7 @@ function closeGeoResults() {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 .fab:hover {
-  transform: scale(1.1) translateY(-2px);
+  filter: brightness(1.08);
 }
 
 /* States */

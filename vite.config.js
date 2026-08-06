@@ -9,6 +9,9 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       injectRegister: 'auto',
+      // Excluir imágenes de backgrounds del precache — son decorativas y el
+      // navegador las cacheará automáticamente con la caché HTTP normal.
+      globIgnores: ['backgrounds/**', 'vintage_bg.png'],
       includeAssets: [
         'favicon.ico',
         'favicon-16x16.png',

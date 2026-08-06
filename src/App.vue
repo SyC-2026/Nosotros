@@ -6,15 +6,12 @@ import LockScreen from './components/LockScreen.vue'
 import MainLayout from './components/MainLayout.vue'
 import MaintenancePage from './components/MaintenancePage.vue'
 
-import vintageBg from './assets/vintage_bg.png'
-
-// Detectar dinámicamente cualquier imagen en src/assets/backgrounds/ (png, jpg, webp, svg)
-const bgModules = import.meta.glob(
-  './assets/backgrounds/*.{png,jpg,jpeg,webp,svg,PNG,JPG,JPEG,WEBP,SVG}',
-  { eager: true, import: 'default' }
-)
-const loadedBgs = Object.values(bgModules)
-const bgList = loadedBgs.length > 0 ? loadedBgs : [vintageBg]
+// Imágenes servidas desde /public/ — no se bundlean, carga lazy por el navegador
+const base = import.meta.env.BASE_URL
+const bgList = [
+  '1.webp', '2.webp', '3.webp', '4.webp', '5.webp', '6.webp',
+  '7.webp', '8.webp', '9.webp', '10.webp', '11.webp', '12.webp'
+].map(f => `${base}backgrounds/${f}`)
 
 const currentBgIndex = ref(0)
 let bgInterval = null

@@ -2,8 +2,11 @@
 import { ref, computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import { useRecuerdos } from '../composables/useRecuerdos.js'
+import { useMomentos } from '../composables/useMomentos.js'
+import BackButton from '../components/BackButton.vue'
 
 const { recuerdos, loading, error, addRecuerdo, updateRecuerdo, deleteRecuerdo } = useRecuerdos()
+const { momentos } = useMomentos()
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 const dateFormatter = new Intl.DateTimeFormat('es-ES', {
@@ -30,7 +33,7 @@ function toDatetimeLocal(date) {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }
 
-// ── Carga dinámica de fotos desde src/assets/fotos/ ────────────────────────────
+// ── Carga dinámica de fotos desde src/assets/fotos/ y Firestore ─────────────────
 const fotoModules = import.meta.glob(
   '../assets/fotos/*.{png,jpg,jpeg,webp,svg,PNG,JPG,JPEG,WEBP,SVG}',
   { eager: true, import: 'default' }
@@ -47,8 +50,25 @@ const fotosMap = computed(() => {
 
 const availableFotoNames = computed(() => Object.keys(fotosMap.value))
 
+const availableFotoOptions = computed(() => {
+  const localList = availableFotoNames.value.map((name) => ({
+    value: name,
+    label: name
+  }))
+
+  const dbList = momentos.value.map((m, index) => ({
+    value: m.url,
+    label: m.title || `Foto ${index + 1}`
+  }))
+
+  return [...localList, ...dbList]
+})
+
 function getFotoUrl(filename) {
   if (!filename) return null
+  if (filename.startsWith('http') || filename.startsWith('data:')) {
+    return filename
+  }
   return fotosMap.value[filename] || null
 }
 
@@ -148,6 +168,7 @@ function closeImagePreview() {
 
 <template>
   <div class="camino-page">
+    <BackButton />
 
     <div class="camino-content">
 
@@ -190,13 +211,44 @@ function closeImagePreview() {
 
       <!-- Timeline -->
       <div v-else class="timeline">
-        <div v-for="recuerdo in recuerdos" :key="recuerdo.id" class="timeline-item">
+        <div v-for="(recuerdo, index) in recuerdos" :key="recuerdo.id" class="memory-entry">
+
+          <!-- Dot en la línea -->
+          <div class="entry-dot">
+            <Icon icon="mdi:heart" class="dot-icon" />
+          </div>
+
           <!-- Card -->
           <div class="memory-card">
-            <!-- Card Header: Title & Edit button -->
-            <div class="card-top">
-              <h3 class="memory-title">{{ recuerdo.titulo }}</h3>
-              <div class="card-actions">
+
+            <!-- Foto -->
+            <div
+              v-if="recuerdo.foto && getFotoUrl(recuerdo.foto)"
+              class="memory-photo-area"
+              @click="openImagePreview(getFotoUrl(recuerdo.foto), recuerdo.titulo)"
+              title="Ampliar imagen"
+            >
+              <img
+                :src="getFotoUrl(recuerdo.foto)"
+                :alt="recuerdo.titulo"
+                loading="lazy"
+              />
+              <div class="photo-expand-hint">
+                <Icon icon="mdi:arrow-expand-all" />
+              </div>
+            </div>
+
+            <!-- Cuerpo de la card -->
+            <div class="card-body">
+              <div class="card-body-left">
+                <h3 class="memory-title">{{ recuerdo.titulo }}</h3>
+                <div v-if="recuerdo.date" class="memory-date">
+                  <Icon icon="mdi:calendar-heart" class="date-icon" />
+                  <span>{{ formatDate(recuerdo.date) }}</span>
+                  <span class="date-time">· {{ formatTime(recuerdo.date) }}</span>
+                </div>
+              </div>
+              <div class="card-actions" @click.stop>
                 <button class="btn-card-action" @click="openEdit(recuerdo)" title="Editar recuerdo">
                   <Icon icon="mdi:pencil-outline" />
                 </button>
@@ -204,42 +256,13 @@ function closeImagePreview() {
                   class="btn-card-action btn-card-delete"
                   :class="{ confirm: deletingRecuerdoId === recuerdo.id }"
                   @click="handleCardDelete(recuerdo)"
-                  :title="deletingRecuerdoId === recuerdo.id ? 'Presiona de nuevo para confirmar eliminación' : 'Eliminar recuerdo'"
+                  :title="deletingRecuerdoId === recuerdo.id ? 'Presiona de nuevo para confirmar' : 'Eliminar recuerdo'"
                 >
                   <Icon :icon="deletingRecuerdoId === recuerdo.id ? 'mdi:alert-circle' : 'mdi:trash-can-outline'" />
                 </button>
               </div>
             </div>
 
-            <!-- Memory photo -->
-            <div
-              v-if="recuerdo.foto && getFotoUrl(recuerdo.foto)"
-              class="memory-photo-box"
-              @click="openImagePreview(getFotoUrl(recuerdo.foto), recuerdo.titulo)"
-              title="Haz clic para ampliar en pantalla completa"
-            >
-              <img
-                :src="getFotoUrl(recuerdo.foto)"
-                :alt="recuerdo.titulo"
-                class="memory-photo"
-                loading="lazy"
-              />
-              <div class="photo-expand-badge">
-                <Icon icon="mdi:arrow-expand-all" />
-              </div>
-            </div>
-
-            <!-- Divider -->
-            <div class="card-divider"><span class="div-line"></span></div>
-
-            <!-- Card Footer: Date badge -->
-            <div class="memory-date-badge" v-if="recuerdo.date">
-              <Icon icon="mdi:calendar-heart" class="badge-icon" />
-              <div class="badge-texts">
-                <span class="badge-day">{{ formatDate(recuerdo.date) }}</span>
-                <span class="badge-time">{{ formatTime(recuerdo.date) }}</span>
-              </div>
-            </div>
           </div>
         </div>
       </div>
@@ -307,8 +330,8 @@ function closeImagePreview() {
               <label class="form-label">Foto asociable (opcional)</label>
               <select v-model="formFoto" class="form-select">
                 <option value="">-- Sin foto --</option>
-                <option v-for="name in availableFotoNames" :key="name" :value="name">
-                  📷 {{ name }}
+                <option v-for="foto in availableFotoOptions" :key="foto.value" :value="foto.value">
+                  {{ foto.label }}
                 </option>
               </select>
             </div>
@@ -374,7 +397,7 @@ function closeImagePreview() {
   position: relative;
   z-index: 10;
   width: 100%;
-  max-width: 600px;
+  max-width: 680px;
   padding: 5rem 1.5rem 6rem;
   display: flex;
   flex-direction: column;
@@ -440,7 +463,7 @@ function closeImagePreview() {
   padding: 3rem 2rem;
   background: var(--theme-card-bg);
   border: 1.5px solid var(--theme-card-border);
-  border-radius: 4px;
+  border-radius: 16px;
   text-align: center;
   color: var(--theme-text-muted);
   font-size: 0.9rem;
@@ -455,102 +478,190 @@ function closeImagePreview() {
 }
 .empty-sub { font-size: 0.85rem; color: var(--theme-text-body); }
 
-/* ── Timeline ─────────────────────────────────────────────────────────────── */
+/* ── Timeline ───────────────────────────────────────────────────────────────────── */
 .timeline {
   display: flex;
   flex-direction: column;
+  gap: 0;
+  position: relative;
 }
-.timeline-item {
+
+/* Línea vertical de fondo */
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 20px;
+  top: 44px;
+  bottom: 32px;
+  width: 1.5px;
+  background: linear-gradient(
+    to bottom,
+    var(--theme-primary) 0%,
+    var(--theme-card-border) 70%,
+    transparent 100%
+  );
+  opacity: 0.4;
+}
+
+.memory-entry {
   display: flex;
-  gap: 1.25rem;
   align-items: flex-start;
+  gap: 1.25rem;
+  padding-bottom: 2rem;
+  position: relative;
 }
-.timeline-connector {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+
+/* Dot circular con corazón */
+.entry-dot {
   flex-shrink: 0;
-  padding-top: 0.2rem;
-}
-.connector-dot {
-  width: 32px;
-  height: 32px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
-  background: var(--theme-badge-bg);
-  border: 1.5px solid var(--theme-card-border);
+  background: var(--theme-card-bg);
+  border: 2px solid var(--theme-primary);
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+  z-index: 2;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease;
 }
-.dot-icon { font-size: 0.9rem; color: var(--theme-primary); }
-.connector-line {
-  width: 1.5px;
-  flex: 1;
-  min-height: 1.5rem;
-  background: linear-gradient(to bottom, var(--theme-secondary), transparent);
-  margin: 0.35rem 0;
+.memory-entry:hover .entry-dot {
+  transform: scale(1.14);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.13);
+}
+.dot-icon {
+  font-size: 0.95rem;
+  color: var(--theme-primary);
 }
 
+/* Memory card */
 .memory-card {
   flex: 1;
   background: var(--theme-card-bg);
   border: 1.5px solid var(--theme-card-border);
-  border-radius: 4px;
-  padding: 1.1rem 1.2rem;
-  margin-bottom: 1rem;
-  box-shadow: 0 2px 10px rgba(160, 110, 60, 0.08);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  border-radius: 20px;
+  overflow: hidden;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  position: relative;
 }
 .memory-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 18px rgba(160, 110, 60, 0.13);
+  transform: translateY(-3px);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.1);
 }
-.memory-card:hover .btn-edit {
+
+/* Área de foto */
+.memory-photo-area {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+.memory-photo-area img {
+  width: 100%;
+  height: auto;
+  max-height: 300px;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.5s ease;
+}
+.memory-photo-area:hover img {
+  transform: scale(1.04);
+}
+.photo-expand-hint {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.38);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.85rem;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  backdrop-filter: blur(4px);
+}
+.memory-photo-area:hover .photo-expand-hint {
   opacity: 1;
 }
 
-.card-top {
+/* Cuerpo de la card */
+.card-body {
+  padding: 1rem 1.2rem 1rem;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 0.5rem;
-  margin-bottom: 0.25rem;
+  gap: 0.75rem;
 }
+.card-body-left {
+  flex: 1;
+  min-width: 0;
+}
+.memory-title {
+  font-family: 'Cause', 'Georgia', serif;
+  font-size: 1.08rem;
+  font-weight: 700;
+  color: var(--theme-text-main);
+  margin: 0 0 0.4rem;
+  line-height: 1.3;
+}
+.memory-date {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: 'Lato', system-ui, sans-serif;
+  font-size: 0.76rem;
+  color: var(--theme-text-muted);
+}
+.date-icon {
+  color: var(--theme-secondary);
+  font-size: 0.95rem;
+  flex-shrink: 0;
+}
+.date-time {
+  color: var(--theme-text-body);
+  opacity: 0.65;
+}
+
+/* Acciones: ocultas hasta hover */
 .card-actions {
   display: flex;
   align-items: center;
   gap: 0.2rem;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  flex-shrink: 0;
+}
+.memory-card:hover .card-actions {
+  opacity: 1;
 }
 .btn-card-action {
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 1.15rem;
+  font-size: 1.05rem;
   color: var(--theme-text-muted);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 4px;
-  border-radius: 4px;
-  transition: color 0.2s ease, background 0.2s ease, transform 0.15s ease;
+  border-radius: 6px;
+  transition: color 0.2s ease, background 0.2s ease;
 }
 .btn-card-action:hover {
   color: var(--theme-primary);
   background: var(--theme-badge-bg);
 }
-.btn-card-delete:hover {
-  color: #e53e3e;
-}
+.btn-card-delete:hover { color: #e53e3e; }
 .btn-card-delete.confirm {
   color: #e53e3e;
-  background: rgba(229, 62, 62, 0.15);
-}
-.memory-title {
-  font-family: 'Cause', 'Georgia', serif;
-  font-size: 1.15rem;
-  font-weight: 700;
-  color: var(--theme-text-main);
-  margin: 0;
   line-height: 1.3;
   flex: 1;
 }
@@ -646,7 +757,7 @@ function closeImagePreview() {
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 .fab:hover {
-  transform: scale(1.1) translateY(-2px);
+  filter: brightness(1.08);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
 }
 .fab:active { transform: scale(0.96); }
@@ -798,47 +909,7 @@ function closeImagePreview() {
   object-fit: cover;
 }
 
-/* ── Memory Photo in Timeline Card ── */
-.memory-photo-box {
-  margin-top: 0.85rem;
-  border-radius: 6px;
-  overflow: hidden;
-  border: 1.5px solid var(--theme-card-border);
-  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08);
-  background: rgba(0, 0, 0, 0.03);
-  position: relative;
-  cursor: pointer;
-}
-.memory-photo {
-  width: 100%;
-  max-height: 320px;
-  object-fit: cover;
-  display: block;
-  transition: transform 0.3s ease;
-}
-.memory-card:hover .memory-photo {
-  transform: scale(1.02);
-}
-.photo-expand-badge {
-  position: absolute;
-  top: 0.6rem;
-  right: 0.6rem;
-  background: rgba(0, 0, 0, 0.55);
-  color: #ffffff;
-  border-radius: 6px;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.1rem;
-  opacity: 0;
-  transition: opacity 0.22s ease, background 0.22s ease;
-  backdrop-filter: blur(4px);
-}
-.memory-photo-box:hover .photo-expand-badge {
-  opacity: 1;
-}
+/* ── (old photo classes removed, now in .memory-photo-area) ── */
 
 /* ── Lightbox Modal ── */
 .lightbox-backdrop {
@@ -919,7 +990,7 @@ function closeImagePreview() {
   transition: opacity 0.2s, transform 0.2s;
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
 }
-.btn-save:hover:not(:disabled) { transform: translateY(-1px); opacity: 0.92; }
+.btn-save:hover:not(:disabled) { opacity: 0.92; }
 .btn-save:disabled { opacity: 0.45; cursor: not-allowed; }
 
 .btn-delete {
