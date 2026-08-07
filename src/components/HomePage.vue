@@ -216,10 +216,10 @@ const pad = (num) => String(num).padStart(2, '0')
 
       <!-- Widget: Next Event (2x1) -->
       <div class="widget w-event">
-        <!-- Top right badge -->
-        <!-- <div class="event-badge">
-          <Icon icon="mdi:heart" />
-        </div> -->
+        <!-- Ícono watermark de fondo -->
+        <div class="event-bg-icon" aria-hidden="true">
+          <Icon icon="mdi:calendar-heart" />
+        </div>
         
         <div class="event-titles">
           <span class="event-subtitle">Próximo Evento: <strong>¡{{ closestEvent.name }}!</strong></span>
@@ -255,7 +255,7 @@ const pad = (num) => String(num).padStart(2, '0')
           <Icon icon="mdi:map-marker-path" />
         </div>
         <div class="nav-content">
-          <Icon icon="mdi:map-marker-path" class="nav-icon-fg" />
+          <!-- <Icon icon="mdi:map-marker-path" class="nav-icon-fg" /> -->
           <span class="nav-label">Lugares visitados</span>
           <span class="nav-sublabel">Nuestros viajes</span>
         </div>
@@ -267,7 +267,7 @@ const pad = (num) => String(num).padStart(2, '0')
           <Icon icon="mdi:timeline-outline" />
         </div>
         <div class="nav-content">
-          <Icon icon="mdi:timeline-outline" class="nav-icon-fg" />
+          <!-- <Icon icon="mdi:timeline-outline" class="nav-icon-fg" /> -->
           <span class="nav-label">Nuestro camino</span>
           <span class="nav-sublabel">Historia juntos</span>
         </div>
@@ -279,7 +279,7 @@ const pad = (num) => String(num).padStart(2, '0')
           <Icon icon="tabler:mail-heart" />
         </div>
         <div class="nav-content">
-          <Icon icon="tabler:mail-heart" class="nav-icon-fg" />
+          <!-- <Icon icon="tabler:mail-heart" class="nav-icon-fg" /> -->
           <span class="nav-label">Cartas</span>
           <span class="nav-sublabel">Mensajes del corazón</span>
         </div>
@@ -291,7 +291,7 @@ const pad = (num) => String(num).padStart(2, '0')
           <Icon icon="mdi:lock-outline" />
         </div>
         <div class="nav-content">
-          <Icon icon="mdi:lock-outline" class="nav-icon-fg" />
+          <!-- <Icon icon="mdi:lock-outline" class="nav-icon-fg" /> -->
           <span class="nav-label">Bloquear</span>
           <span class="nav-sublabel">Cerrar sesión</span>
         </div>
@@ -318,8 +318,8 @@ const pad = (num) => String(num).padStart(2, '0')
 .dashboard-header {
   display: flex;
   align-items: center;
-  gap: 1.5rem;
-  margin-bottom: 2.5rem;
+  gap: 1rem;
+  margin-bottom: 1rem;
 }
 .site-title {
   font-family: 'Cause', 'Georgia', serif;
@@ -580,6 +580,30 @@ const pad = (num) => String(num).padStart(2, '0')
   background: var(--theme-drawer-bg);
   text-align: center;
   box-sizing: border-box;
+}
+.event-bg-icon {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  pointer-events: none;
+  overflow: hidden;
+  padding-right: 0.5rem;
+}
+.event-bg-icon svg,
+.event-bg-icon iconify-icon {
+  width: 65%;
+  height: 65%;
+  color: var(--theme-primary);
+  opacity: 0.07;
+  transition: opacity 0.35s ease, transform 0.35s ease;
+  transform: rotate(-8deg) scale(1);
+}
+.w-event:hover .event-bg-icon svg,
+.w-event:hover .event-bg-icon iconify-icon {
+  opacity: 0.12;
+  transform: rotate(-4deg) scale(1.05);
 }
 .event-badge {
   position: absolute;

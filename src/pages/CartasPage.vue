@@ -4,6 +4,7 @@ import { Icon } from '@iconify/vue'
 import { useCartas } from '../composables/useCartas.js'
 import { useRelationshipStore } from '../stores/relationship.js'
 import BackButton from '../components/BackButton.vue'
+import DynamicFormModal from '../components/DynamicFormModal.vue'
 
 const { cartas, loading, error, addCarta, updateCarta, deleteCarta } = useCartas()
 const rel = useRelationshipStore()
@@ -26,37 +27,48 @@ function toDateOnly(date) {
 // ── Modal state ───────────────────────────────────────────────────────────────
 const showModal    = ref(false)
 const editTarget   = ref(null)
-const formTitulo   = ref('')
-const formContenido = ref('')
-const formDe       = ref('')
-const formPara     = ref('')
-const formDatetime = ref('')
 const saving       = ref(false)
+const confirmDelete = ref(false)
+
+const formData = ref({
+  titulo: '',
+  autor: '',
+  datetime: '',
+  contenido: ''
+})
+
+const modalSchema = computed(() => [
+  { id: 'titulo', type: 'text', label: 'Título de la carta', placeholder: 'Ej: Para cuando estés triste...', fullWidth: true },
+  { id: 'autor', type: 'text', label: 'Autor', placeholder: 'Tu nombre', fullWidth: true },
+  { id: 'datetime', type: 'date', label: 'Fecha', fullWidth: true },
+  { id: 'contenido', type: 'textarea', label: 'Contenido de la carta', placeholder: 'Escribí tu carta aquí... con todo el amor del mundo ♥', fullWidth: true, rows: 8 }
+])
 
 const modalTitle = computed(() => editTarget.value ? 'Editar carta' : 'Escribir carta')
 
 function openAdd() {
   editTarget.value    = null
-  formTitulo.value    = ''
-  formContenido.value = ''
-  formDe.value        = rel.coupleNames?.split(' & ')[0] || ''
-  formPara.value      = rel.coupleNames?.split(' & ')[1] || ''
-  formDatetime.value  = toDateOnly(new Date())
+  formData.value.titulo    = ''
+  formData.value.contenido = ''
+  formData.value.autor     = ''
+  formData.value.datetime  = toDateOnly(new Date())
+  confirmDelete.value = false
   showModal.value     = true
 }
 
 function openEdit(carta) {
   editTarget.value    = carta
-  formTitulo.value    = carta.titulo    || ''
-  formContenido.value = carta.contenido || ''
-  formDe.value        = carta.de        || ''
-  formPara.value      = carta.para      || ''
-  formDatetime.value  = toDateOnly(carta.date || new Date())
+  formData.value.titulo    = carta.titulo    || ''
+  formData.value.contenido = carta.contenido || ''
+  formData.value.autor     = carta.autor     || ''
+  formData.value.datetime  = toDateOnly(carta.date || new Date())
+  confirmDelete.value = false
   showModal.value     = true
 }
 
 function closeModal() {
   showModal.value = false
+  confirmDelete.value = false
 }
 
 // ── Read modal ───────────────────────────────────────────────────────────────
@@ -74,6 +86,7 @@ async function handleCardDelete(carta) {
     deletingCartaId.value = null
     await deleteCarta(carta.id)
     if (readCarta.value?.id === carta.id) closeRead()
+    closeModal()
   } else {
     deletingCartaId.value = carta.id
     clearTimeout(deleteCartaTimeout)
@@ -95,14 +108,15 @@ function handleBackdropClick(e) {
 
 // ── Save ──────────────────────────────────────────────────────────────────────
 async function handleSave() {
-  if (!formTitulo.value.trim() && !formContenido.value.trim()) return
+  const { titulo, contenido, autor, datetime } = formData.value
+  if (!titulo.trim() && !contenido.trim()) return
   saving.value = true
   try {
-    const date = formDatetime.value ? new Date(formDatetime.value + 'T12:00:00') : new Date()
+    const date = datetime ? new Date(datetime + 'T12:00:00') : new Date()
     if (editTarget.value) {
-      await updateCarta(editTarget.value.id, formTitulo.value.trim(), formContenido.value.trim(), formDe.value.trim(), formPara.value.trim(), date)
+      await updateCarta(editTarget.value.id, titulo.trim(), contenido.trim(), autor.trim(), date)
     } else {
-      await addCarta(formTitulo.value.trim(), formContenido.value.trim(), formDe.value.trim(), formPara.value.trim(), date)
+      await addCarta(titulo.trim(), contenido.trim(), autor.trim(), date)
     }
     closeModal()
   } catch (e) {
@@ -163,17 +177,17 @@ async function handleSave() {
           class="carta-card"
           @click="openRead(carta)"
         >
-          <!-- Wax seal decoration -->
-          <div class="carta-seal">✉</div>
+          <!-- Background icon -->
+          <div class="carta-bg-icon">
+            <Icon icon="mdi:email-heart-outline" />
+          </div>
 
           <!-- Card header -->
           <div class="carta-header">
             <div class="carta-meta">
               <h3 class="carta-titulo">{{ carta.titulo }}</h3>
-              <div v-if="carta.de || carta.para" class="carta-from-to">
-                <span v-if="carta.de">De: <strong>{{ carta.de }}</strong></span>
-                <span v-if="carta.de && carta.para" class="meta-sep">→</span>
-                <span v-if="carta.para">Para: <strong>{{ carta.para }}</strong></span>
+              <div v-if="carta.autor" class="carta-from-to">
+                <span>Autor: <strong>{{ carta.autor }}</strong></span>
               </div>
             </div>
             <div class="carta-actions" @click.stop>
@@ -191,16 +205,12 @@ async function handleSave() {
             </div>
           </div>
 
-          <!-- Date -->
-          <div v-if="carta.date" class="carta-date">
-            <Icon icon="mdi:calendar-heart" />
-            <span>{{ formatDate(carta.date) }}</span>
-          </div>
-
-          <!-- Open hint -->
-          <div class="carta-open-hint">
-            <Icon icon="mdi:email-open-outline" />
-            <span>Leer carta</span>
+          <!-- Date Footer (Line + Date) -->
+          <div v-if="carta.date" class="carta-card-footer">
+            <div class="carta-date">
+              <Icon icon="mdi:calendar-heart" />
+              <span>{{ formatDate(carta.date) }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -213,96 +223,18 @@ async function handleSave() {
     </button>
 
     <!-- ── Modal Form ──────────────────────────────────────────────────────── -->
-    <transition name="modal-fade">
-      <div
-        v-if="showModal"
-        class="modal-backdrop"
-        @mousedown="handleBackdropMouseDown"
-        @click="handleBackdropClick"
-      >
-        <div class="modal-card">
-
-          <div class="modal-header">
-            <h2 class="modal-title">{{ modalTitle }}</h2>
-            <button class="btn-modal-close" @click="closeModal">
-              <Icon icon="mdi:close" />
-            </button>
-          </div>
-
-          <div class="modal-ornament">
-            <span class="orn-line"></span>
-            <span class="modal-heart">♥</span>
-            <span class="orn-line"></span>
-          </div>
-
-          <div class="modal-body">
-
-            <div class="form-group">
-              <label class="form-label">Título de la carta</label>
-              <input
-                v-model="formTitulo"
-                type="text"
-                class="form-input"
-                placeholder="Ej: Para cuando estés triste, Mi promesa para vos..."
-              />
-            </div>
-
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label">De</label>
-                <input
-                  v-model="formDe"
-                  type="text"
-                  class="form-input"
-                  placeholder="Tu nombre"
-                />
-              </div>
-              <div class="form-group">
-                <label class="form-label">Para</label>
-                <input
-                  v-model="formPara"
-                  type="text"
-                  class="form-input"
-                  placeholder="Nombre del destinatario"
-                />
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Fecha</label>
-              <input v-model="formDatetime" type="date" class="form-input" />
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Contenido de la carta</label>
-              <textarea
-                v-model="formContenido"
-                class="form-textarea carta-textarea"
-                rows="8"
-                placeholder="Escribí tu carta aquí... con todo el amor del mundo ♥"
-              ></textarea>
-            </div>
-
-          </div>
-
-          <div class="modal-actions">
-            <div class="actions-right">
-              <button class="btn-cancel" @click="closeModal" :disabled="saving">Cancelar</button>
-              <button
-                class="btn-save"
-                @click="handleSave"
-                :disabled="saving || (!formTitulo.trim() && !formContenido.trim())"
-              >
-                <Icon v-if="saving" icon="mdi:loading" class="spin-icon-sm" />
-                <Icon v-else icon="mdi:send-outline" />
-                {{ saving ? 'Guardando...' : 'Guardar carta' }}
-              </button>
-            </div>
-          </div>
-
-        </div>
-      </div>
-    </transition>
+    <!-- ── Dynamic Modal Form ─────────────────────────────────────────────── -->
+    <DynamicFormModal
+      :show="showModal"
+      :title="modalTitle"
+      :schema="modalSchema"
+      v-model="formData"
+      :loading="saving"
+      saveText="Guardar carta"
+      saveIcon="mdi:send-outline"
+      @close="closeModal"
+      @save="handleSave"
+    />
 
     <!-- ── Read Modal ─────────────────────────────────────────────────────── -->
     <transition name="modal-fade">
@@ -315,13 +247,10 @@ async function handleSave() {
 
           <!-- Header -->
           <div class="read-modal-header">
-            <div class="read-modal-seal">✉</div>
             <div class="read-modal-meta">
               <h2 class="read-modal-titulo">{{ readCarta.titulo }}</h2>
-              <div v-if="readCarta.de || readCarta.para" class="carta-from-to">
-                <span v-if="readCarta.de">De: <strong>{{ readCarta.de }}</strong></span>
-                <span v-if="readCarta.de && readCarta.para" class="meta-sep">→</span>
-                <span v-if="readCarta.para">Para: <strong>{{ readCarta.para }}</strong></span>
+              <div v-if="readCarta.autor" class="carta-from-to">
+                <span>Autor: <strong>{{ readCarta.autor }}</strong></span>
               </div>
               <div v-if="readCarta.date" class="carta-date">
                 <Icon icon="mdi:calendar-heart" />
@@ -444,7 +373,7 @@ async function handleSave() {
 /* Cards grid */
 .cartas-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  grid-template-columns: 1fr;
   gap: 1.25rem;
 }
 
@@ -467,20 +396,34 @@ async function handleSave() {
   box-shadow: 0 4px 18px rgba(0,0,0,0.1);
 }
 
-/* Wax seal */
-.carta-seal {
+/* Background icon */
+.carta-bg-icon {
   position: absolute;
-  top: -0.4rem;
-  right: 1rem;
-  font-size: 2rem;
-  color: var(--theme-secondary);
-  opacity: 0.25;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
   pointer-events: none;
-  line-height: 1;
+  overflow: hidden;
+  padding-right: 1.5rem;
+}
+.carta-bg-icon svg {
+  width: 130px;
+  height: 130px;
+  color: var(--theme-primary);
+  opacity: 0.05;
+  transition: opacity 0.35s ease, transform 0.35s ease;
+  transform: rotate(-10deg) translateY(10px);
+}
+.carta-card:hover .carta-bg-icon svg {
+  opacity: 0.1;
+  transform: rotate(-5deg) translateY(0px) scale(1.05);
 }
 
 /* Card header */
 .carta-header {
+  position: relative;
+  z-index: 2;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -531,6 +474,18 @@ async function handleSave() {
 .btn-card-delete:hover { color: #e53e3e; }
 .btn-card-delete.confirm { color: #e53e3e; background: rgba(229,62,62,0.12); }
 
+/* Card Footer */
+.carta-card-footer {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-top: 1px solid var(--theme-card-border);
+  padding-top: 0.6rem;
+  margin-top: 0.2rem;
+  position: relative;
+  z-index: 2;
+}
+
 /* Date */
 .carta-date {
   display: flex;
@@ -540,21 +495,6 @@ async function handleSave() {
   font-size: 0.78rem;
   color: var(--theme-text-muted);
 }
-
-/* Open hint */
-.carta-open-hint {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.3rem;
-  font-family: 'Lato', system-ui, sans-serif;
-  font-size: 0.75rem;
-  color: var(--theme-text-muted);
-  padding-top: 0.4rem;
-  border-top: 1px solid var(--theme-card-border);
-  transition: color 0.2s ease;
-}
-.carta-card:hover .carta-open-hint { color: var(--theme-primary); }
 
 /* Read modal */
 .read-modal-card {
@@ -610,7 +550,7 @@ async function handleSave() {
   right: 2rem;
   width: 52px;
   height: 52px;
-  border-radius: 50%;
+  border-radius: 14px;
   background: var(--theme-btn-gradient);
   border: none;
   color: #fff9f5;

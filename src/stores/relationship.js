@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 
 export const useRelationshipStore = defineStore('relationship', () => {
   // --- Estado de desbloqueo ---
@@ -14,8 +14,13 @@ export const useRelationshipStore = defineStore('relationship', () => {
   const name1 = 'Santi'
   const name2 = 'Cami'
 
-  // --- Tema activo ('cami' | 'santi') ---
   const currentTheme = ref(localStorage.getItem('nosotros_theme') || 'cami')
+
+  // --- Celebración del 14 de cada mes ---
+  const isCelebrationDay = computed(() => {
+    const now = new Date()
+    return now.getDate() === 6
+  })
 
   function applyTheme(theme) {
     if (typeof document !== 'undefined') {
@@ -23,6 +28,12 @@ export const useRelationshipStore = defineStore('relationship', () => {
         document.body.classList.add('theme-santi')
       } else {
         document.body.classList.remove('theme-santi')
+      }
+
+      if (isCelebrationDay.value && isUnlocked.value) {
+        document.body.classList.add('theme-celebration')
+      } else {
+        document.body.classList.remove('theme-celebration')
       }
     }
   }
@@ -35,6 +46,10 @@ export const useRelationshipStore = defineStore('relationship', () => {
 
   // Inicializar clase en body
   applyTheme(currentTheme.value)
+
+  watch(isUnlocked, () => {
+    applyTheme(currentTheme.value)
+  })
 
   // --- Intento de desbloqueo ---
   function tryUnlock(inputDate) {
@@ -92,6 +107,7 @@ export const useRelationshipStore = defineStore('relationship', () => {
     tryUnlock,
     lock,
     daysTogther,
-    milestones
+    milestones,
+    isCelebrationDay
   }
 })

@@ -6,6 +6,7 @@ import 'leaflet/dist/leaflet.css'
 import { useLugares } from '../composables/useLugares.js'
 import { useMomentos } from '../composables/useMomentos.js'
 import BackButton from '../components/BackButton.vue'
+import DynamicFormModal from '../components/DynamicFormModal.vue'
 
 const { lugares, loading, error, addLugar, updateLugar, deleteLugar } = useLugares()
 const { momentos } = useMomentos()
@@ -69,6 +70,9 @@ let mapInstance = null
 let markerGroup = null
 const selectedLugarId = ref(null)
 
+// ── Card Refs for Scrolling ───────────────────────────────────────────────────
+const cardRefs = ref({})
+
 function refreshMapSize() {
   nextTick(() => {
     mapInstance?.invalidateSize({ animate: false })
@@ -101,8 +105,8 @@ function initMap() {
   // Hacer clic en el mapa para capturar coordenadas al agregar/editar
   mapInstance.on('click', (e) => {
     if (showModal.value) {
-      formLat.value = Number(e.latlng.lat.toFixed(6))
-      formLng.value = Number(e.latlng.lng.toFixed(6))
+      formData.value.lat = Number(e.latlng.lat.toFixed(6))
+      formData.value.lng = Number(e.latlng.lng.toFixed(6))
     }
   })
 
@@ -135,7 +139,7 @@ function updateMapMarkers() {
 
       const marker = L.marker([place.lat, place.lng], { icon: customIcon })
       marker.on('click', () => {
-        selectLugar(place)
+        selectLugar(place, true)
       })
 
       markerGroup.addLayer(marker)
@@ -147,12 +151,17 @@ function updateMapMarkers() {
   }
 }
 
-function selectLugar(place) {
+function selectLugar(place, fromMap = false) {
   selectedLugarId.value = place.id
   if (mapInstance && place.lat && place.lng) {
     mapInstance.flyTo([place.lat, place.lng], 15, { animate: true, duration: 1.2 })
   }
   updateMapMarkers()
+  
+  if (fromMap && cardRefs.value[place.id]) {
+    // Scroll a la tarjeta del lugar correspondiente
+    cardRefs.value[place.id].scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
 }
 
 watch(lugares, () => {
@@ -185,57 +194,75 @@ onUnmounted(() => {
 // ── Modal State ───────────────────────────────────────────────────────────────
 const showModal     = ref(false)
 const editTarget    = ref(null)
-const formTitulo    = ref('')
-const formLugar     = ref('')
-const formLat       = ref(-34.6037)
-const formLng       = ref(-58.3816)
-const formDesc      = ref('')
-const formDatetime  = ref('')
-const formFoto      = ref('')
 const saving        = ref(false)
 const confirmDelete = ref(false)
+
+const formData = ref({
+  titulo: '',
+  lugar: '',
+  lat: -34.6037,
+  lng: -58.3816,
+  desc: '',
+  datetime: '',
+  foto: ''
+})
+
+const modalSchema = computed(() => [
+  { id: 'geocoder', type: 'slot', fullWidth: true },
+  { id: 'titulo', type: 'text', label: 'Título de la salida', placeholder: 'Ej: Primera cita, Paseo...' },
+  { id: 'lugar', type: 'text', label: 'Nombre del lugar', placeholder: 'Ej: Puerto Madero, San Telmo...' },
+  { id: 'lat', type: 'number', label: 'Latitud', step: 'any' },
+  { id: 'lng', type: 'number', label: 'Longitud', step: 'any' },
+  { id: 'desc', type: 'textarea', label: 'Descripción o recuerdo (opcional)', fullWidth: true, rows: 2, placeholder: 'Ej: Tomamos un café...' },
+  { id: 'datetime', type: 'date', label: 'Fecha del paseo' },
+  { id: 'foto', type: 'select', label: 'Foto asociable (opcional)', options: [{ label: 'Ninguna', value: '' }, ...availableFotoOptions.value] },
+  { id: 'preview', type: 'slot', fullWidth: true }
+])
 
 const modalTitle = computed(() =>
   editTarget.value ? 'Editar lugar' : 'Nuevo lugar visitado'
 )
 
 function openAdd() {
-  editTarget.value    = null
-  formTitulo.value    = ''
-  formLugar.value     = ''
-  geoQuery.value      = ''
-  geoShowResults.value = false
-  geoResults.value    = []
-  // Usar las coordenadas del mapa actual o por defecto
+  editTarget.value = null
+  
   if (mapInstance) {
     const center = mapInstance.getCenter()
-    formLat.value = Number(center.lat.toFixed(6))
-    formLng.value = Number(center.lng.toFixed(6))
+    formData.value.lat = Number(center.lat.toFixed(6))
+    formData.value.lng = Number(center.lng.toFixed(6))
   } else {
-    formLat.value = -34.6037
-    formLng.value = -58.3816
+    formData.value.lat = -34.6037
+    formData.value.lng = -58.3816
   }
-  formDesc.value      = ''
-  formDatetime.value  = toDateOnly(new Date())
-  formFoto.value      = ''
-  confirmDelete.value = false
-  showModal.value     = true
+
+  formData.value.titulo = ''
+  formData.value.lugar = ''
+  formData.value.desc = ''
+  formData.value.datetime = toDateOnly(new Date())
+  formData.value.foto = ''
+
+  geoQuery.value       = ''
+  geoShowResults.value = false
+  geoResults.value     = []
+  confirmDelete.value  = false
+  showModal.value      = true
 }
 
 function openEdit(place) {
-  editTarget.value    = place
-  formTitulo.value    = place.titulo || place.nombre || ''
-  formLugar.value     = place.lugar || place.nombre || ''
-  formLat.value       = place.lat
-  formLng.value       = place.lng
-  formDesc.value      = place.descripcion || ''
-  formDatetime.value  = toDateOnly(place.date || new Date())
-  formFoto.value      = place.foto || ''
-  geoQuery.value      = ''
+  editTarget.value = place
+  formData.value.titulo = place.titulo || place.nombre || ''
+  formData.value.lugar = place.lugar || place.nombre || ''
+  formData.value.lat = place.lat
+  formData.value.lng = place.lng
+  formData.value.desc = place.descripcion || ''
+  formData.value.datetime = toDateOnly(place.date || new Date())
+  formData.value.foto = place.foto || ''
+
+  geoQuery.value       = ''
   geoShowResults.value = false
-  geoResults.value    = []
-  confirmDelete.value = false
-  showModal.value     = true
+  geoResults.value     = []
+  confirmDelete.value  = false
+  showModal.value      = true
 }
 
 function closeModal() {
@@ -272,33 +299,34 @@ async function handleCardDelete(lugar) {
 }
 
 async function handleSave() {
-  if ((!formTitulo.value.trim() && !formLugar.value.trim()) || !formLat.value || !formLng.value) return
+  const { titulo, lugar, lat, lng, desc, datetime, foto } = formData.value
+  if ((!titulo.trim() && !lugar.trim()) || !lat || !lng) return
   saving.value = true
   try {
-    const date = formDatetime.value ? new Date(formDatetime.value + 'T12:00:00') : new Date()
-    const tituloVal = formTitulo.value.trim() || formLugar.value.trim()
-    const lugarVal  = formLugar.value.trim() || formTitulo.value.trim()
+    const date = datetime ? new Date(datetime + 'T12:00:00') : new Date()
+    const tituloVal = titulo.trim() || lugar.trim()
+    const lugarVal  = lugar.trim() || titulo.trim()
 
     if (editTarget.value) {
       await updateLugar(
         editTarget.value.id,
         tituloVal,
         lugarVal,
-        formLat.value,
-        formLng.value,
-        formDesc.value.trim(),
+        lat,
+        lng,
+        desc.trim(),
         date,
-        formFoto.value
+        foto
       )
     } else {
       await addLugar(
         tituloVal,
         lugarVal,
-        formLat.value,
-        formLng.value,
-        formDesc.value.trim(),
+        lat,
+        lng,
+        desc.trim(),
         date,
-        formFoto.value
+        foto
       )
     }
     closeModal()
@@ -352,15 +380,15 @@ async function searchGeocode(q) {
 }
 
 function selectGeoResult(result) {
-  formLat.value    = Number(parseFloat(result.lat).toFixed(6))
-  formLng.value    = Number(parseFloat(result.lon).toFixed(6))
+  formData.value.lat = Number(parseFloat(result.lat).toFixed(6))
+  formData.value.lng = Number(parseFloat(result.lon).toFixed(6))
   // Rellenar nombre del lugar si está vacío
-  if (!formLugar.value.trim()) {
-    formLugar.value = result.name || result.display_name.split(',')[0]
+  if (!formData.value.lugar.trim()) {
+    formData.value.lugar = result.name || result.display_name.split(',')[0]
   }
   // Centrar mapa en el resultado
   if (mapInstance) {
-    mapInstance.flyTo([formLat.value, formLng.value], 16, { animate: true, duration: 1 })
+    mapInstance.flyTo([formData.value.lat, formData.value.lng], 16, { animate: true, duration: 1 })
   }
   geoQuery.value       = result.display_name.split(',').slice(0, 2).join(', ')
   geoShowResults.value = false
@@ -430,6 +458,7 @@ function closeGeoResults() {
           <div
             v-for="lugar in lugares"
             :key="lugar.id"
+            :ref="el => { if (el) cardRefs[lugar.id] = el }"
             class="place-card"
             :class="{ active: lugar.id === selectedLugarId }"
             @click="selectLugar(lugar)"
@@ -493,157 +522,64 @@ function closeGeoResults() {
     </button>
 
     <!-- ── Modal Form ─────────────────────────────────────────────────────── -->
-    <transition name="modal-fade">
-      <div
-        v-if="showModal"
-        class="modal-backdrop"
-        @mousedown="handleBackdropMouseDown"
-        @click="handleBackdropClick"
-      >
-        <div class="modal-card">
-
-          <div class="modal-header">
-            <h2 class="modal-title">{{ modalTitle }}</h2>
-            <button class="btn-modal-close" @click="closeModal">
-              <Icon icon="mdi:close" />
-            </button>
+    <!-- ── Dynamic Modal Form ─────────────────────────────────────────────── -->
+    <DynamicFormModal
+      :show="showModal"
+      :title="modalTitle"
+      :schema="modalSchema"
+      v-model="formData"
+      :loading="saving"
+      saveText="Guardar"
+      @close="closeModal"
+      @save="handleSave"
+    >
+      <template #field-geocoder>
+        <!-- Geocoder Search -->
+        <label class="form-label">
+          <Icon icon="mdi:magnify" style="margin-right:4px;" />
+          Buscar lugar o dirección
+        </label>
+        <div class="geo-search-wrap">
+          <div class="geo-input-row">
+            <input
+              v-model="geoQuery"
+              type="text"
+              class="form-input"
+              placeholder="Ej: Puerto Madero, Jardín Japonés, Unicenter..."
+              @blur="closeGeoResults"
+              autocomplete="off"
+            />
+            <span v-if="geoLoading" class="geo-loader">
+              <Icon icon="mdi:loading" class="spin-icon-sm" />
+            </span>
           </div>
-
-          <div class="modal-ornament">
-            <span class="orn-line"></span>
-            <span class="modal-heart">♥</span>
-            <span class="orn-line"></span>
-          </div>
-
-          <div class="modal-body">
-
-            <!-- Geocoder Search -->
-            <div class="form-group">
-              <label class="form-label">
-                <Icon icon="mdi:magnify" />
-                Buscar lugar o dirección
-              </label>
-              <div class="geo-search-wrap">
-                <div class="geo-input-row">
-                  <input
-                    v-model="geoQuery"
-                    type="text"
-                    class="form-input"
-                    placeholder="Ej: Puerto Madero, Jardín Japonés, Unicenter..."
-                    @blur="closeGeoResults"
-                    autocomplete="off"
-                  />
-                  <span v-if="geoLoading" class="geo-loader">
-                    <Icon icon="mdi:loading" class="spin-icon-sm" />
-                  </span>
-                </div>
-                <transition name="geo-drop">
-                  <ul v-if="geoShowResults" class="geo-results">
-                    <li
-                      v-for="r in geoResults"
-                      :key="r.place_id"
-                      class="geo-result-item"
-                      @mousedown.prevent="selectGeoResult(r)"
-                    >
-                      <Icon icon="mdi:map-marker-outline" class="geo-result-icon" />
-                      <div class="geo-result-texts">
-                        <span class="geo-result-name">{{ r.name || r.display_name.split(',')[0] }}</span>
-                        <span class="geo-result-sub">{{ r.display_name }}</span>
-                      </div>
-                    </li>
-                  </ul>
-                </transition>
-              </div>
-              <p class="geo-hint">Busca y seleccioná un resultado para autocompletar coordenadas y nombre 📍</p>
-            </div>
-
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label">Título de la salida</label>
-                <input
-                  v-model="formTitulo"
-                  type="text"
-                  class="form-input"
-                  placeholder="Ej: Primera cita, Paseo atardecer..."
-                  @keyup.enter="handleSave"
-                />
-              </div>
-              <div class="form-group">
-                <label class="form-label">Nombre del lugar</label>
-                <input
-                  v-model="formLugar"
-                  type="text"
-                  class="form-input"
-                  placeholder="Ej: Puerto Madero, San Telmo..."
-                  @keyup.enter="handleSave"
-                />
-              </div>
-            </div>
-
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label">Latitud</label>
-                <input v-model.number="formLat" type="number" step="any" class="form-input" />
-              </div>
-              <div class="form-group">
-                <label class="form-label">Longitud</label>
-                <input v-model.number="formLng" type="number" step="any" class="form-input" />
-              </div>
-            </div>
-            <!-- <p class="map-picker-tip">💡 O tocá cualquier punto en el mapa para capturar sus coordenadas.</p> -->
-
-            <div class="form-group">
-              <label class="form-label">Descripción o recuerdo (opcional)</label>
-              <textarea
-                v-model="formDesc"
-                class="form-textarea"
-                rows="2"
-                placeholder="Ej: Tomamos un café y paseamos hasta el atardecer..."
-              ></textarea>
-            </div>
-
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label">Fecha del paseo</label>
-                <input v-model="formDatetime" type="date" class="form-input" />
-              </div>
-              <div class="form-group">
-                <label class="form-label">Foto asociable (opcional)</label>
-                <select v-model="formFoto" class="form-select">
-                  <option value="">-- Sin foto --</option>
-                  <option v-for="foto in availableFotoOptions" :key="foto.value" :value="foto.value">
-                    {{ foto.label }}
-                  </option>
-                </select>
-              </div>
-            </div>
-
-            <!-- Preview selected photo -->
-            <div v-if="formFoto && getFotoUrl(formFoto)" class="form-foto-preview">
-              <img :src="getFotoUrl(formFoto)" :alt="formFoto" />
-            </div>
-          </div>
-
-          <div class="modal-actions">
-            <div class="actions-right">
-              <button class="btn-cancel" @click="closeModal" :disabled="saving">
-                Cancelar
-              </button>
-              <button
-                class="btn-save"
-                @click="handleSave"
-                :disabled="saving || (!formTitulo.trim() && !formLugar.trim()) || !formLat || !formLng"
+          <transition name="geo-drop">
+            <ul v-if="geoShowResults" class="geo-results">
+              <li
+                v-for="r in geoResults"
+                :key="r.place_id"
+                class="geo-result-item"
+                @mousedown.prevent="selectGeoResult(r)"
               >
-                <Icon v-if="saving" icon="mdi:loading" class="spin-icon-sm" />
-                <Icon v-else icon="mdi:content-save-outline" />
-                {{ saving ? 'Guardando...' : 'Guardar' }}
-              </button>
-            </div>
-          </div>
-
+                <Icon icon="mdi:map-marker-outline" class="geo-result-icon" />
+                <div class="geo-result-texts">
+                  <span class="geo-result-name">{{ r.name || r.display_name.split(',')[0] }}</span>
+                  <span class="geo-result-sub">{{ r.display_name }}</span>
+                </div>
+              </li>
+            </ul>
+          </transition>
         </div>
-      </div>
-    </transition>
+        <p class="geo-hint">Busca y seleccioná un resultado para autocompletar coordenadas y nombre 📍</p>
+      </template>
+
+      <template #field-preview>
+        <!-- Preview selected photo -->
+        <div v-if="formData.foto && getFotoUrl(formData.foto)" class="form-foto-preview">
+          <img :src="getFotoUrl(formData.foto)" :alt="formData.foto" />
+        </div>
+      </template>
+    </DynamicFormModal>
 
     <!-- ── Lightbox Preview ───────────────────────────────────────────────── -->
     <transition name="modal-fade">
@@ -980,7 +916,7 @@ function closeGeoResults() {
   z-index: 50;
   width: 52px;
   height: 52px;
-  border-radius: 50%;
+  border-radius: 14px;
   background: var(--theme-btn-gradient);
   border: none;
   color: #fff9f5;
@@ -1011,67 +947,7 @@ function closeGeoResults() {
   font-size: 0.9rem;
 }
 
-/* Modal styles */
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 300;
-  background: rgba(0, 0, 0, 0.55);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
-}
-.modal-card {
-  background: var(--theme-drawer-bg);
-  border: 1.5px solid var(--theme-card-border);
-  border-radius: 8px;
-  width: 100%;
-  max-width: 480px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
-  overflow: hidden;
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
-}
-.modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1.25rem 1.5rem 0.75rem;
-}
-.modal-title {
-  font-family: 'Cause', 'Georgia', serif;
-  font-size: 1.3rem;
-  font-weight: 700;
-  color: var(--theme-text-main);
-  margin: 0;
-}
-.btn-modal-close {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 1.2rem;
-  color: var(--theme-text-muted);
-}
-.modal-ornament {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0 1.5rem 0.5rem;
-}
-.modal-heart {
-  color: var(--theme-primary);
-  font-size: 0.7rem;
-}
-.modal-body {
-  padding: 0.5rem 1.5rem 1.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.85rem;
-  overflow-y: auto;
-}
+/* States */
 .form-group {
   display: flex;
   flex-direction: column;
@@ -1119,55 +995,7 @@ function closeGeoResults() {
   object-fit: cover;
 }
 
-.modal-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.6rem;
-  padding: 1rem 1.5rem 1.25rem;
-  background: rgba(0, 0, 0, 0.02);
-  border-top: 1px solid var(--theme-card-border);
-}
-.actions-right {
-  display: flex;
-  gap: 0.6rem;
-  justify-content: flex-end;
-}
-.btn-cancel {
-  background: transparent;
-  border: 1.5px solid var(--theme-card-border);
-  border-radius: 6px;
-  padding: 0.6rem 1.1rem;
-  font-size: 0.85rem;
-  color: var(--theme-text-body);
-  cursor: pointer;
-  font-family: 'Cause', system-ui, sans-serif;
-}
-.btn-save {
-  background: var(--theme-btn-gradient);
-  border: none;
-  border-radius: 6px;
-  padding: 0.6rem 1.2rem;
-  font-size: 0.85rem;
-  font-weight: 700;
-  color: #fff9f5;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  font-family: 'Cause', system-ui, sans-serif;
-}
-.btn-delete {
-  background: transparent;
-  border: 1.5px solid var(--theme-primary);
-  border-radius: 6px;
-  padding: 0.6rem 0.9rem;
-  font-size: 0.85rem;
-  color: var(--theme-primary);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-}
+/* Actions (for other uses if any) */
 .btn-edit {
   background: none;
   border: none;

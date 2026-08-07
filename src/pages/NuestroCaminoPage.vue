@@ -4,6 +4,7 @@ import { Icon } from '@iconify/vue'
 import { useRecuerdos } from '../composables/useRecuerdos.js'
 import { useMomentos } from '../composables/useMomentos.js'
 import BackButton from '../components/BackButton.vue'
+import DynamicFormModal from '../components/DynamicFormModal.vue'
 
 const { recuerdos, loading, error, addRecuerdo, updateRecuerdo, deleteRecuerdo } = useRecuerdos()
 const { momentos } = useMomentos()
@@ -75,37 +76,46 @@ function getFotoUrl(filename) {
 // ── Modal state ───────────────────────────────────────────────────────────────
 const showModal    = ref(false)
 const editTarget   = ref(null)   // null = new record, object = editing existing
-const formTitulo   = ref('')
-const formDatetime = ref('')
-const formFoto     = ref('')
 const saving       = ref(false)
 const confirmDelete = ref(false)
+
+const formData = ref({
+  titulo: '',
+  datetime: '',
+  foto: ''
+})
+
+const modalSchema = computed(() => [
+  { id: 'titulo', type: 'text', label: 'Título del recuerdo', placeholder: 'Ej: Primera cena juntos...', fullWidth: true },
+  { id: 'datetime', type: 'datetime-local', label: 'Fecha y hora', fullWidth: true },
+  { id: 'foto', type: 'select', label: 'Foto asociable (opcional)', options: [{ label: 'Ninguna', value: '' }, ...availableFotoOptions.value], fullWidth: true },
+  { id: 'preview', type: 'slot', fullWidth: true }
+])
 
 const modalTitle = computed(() =>
   editTarget.value ? 'Editar recuerdo' : 'Nuevo recuerdo'
 )
 
 function openAdd() {
-  editTarget.value   = null
-  formTitulo.value   = ''
-  formFoto.value     = ''
-  // Default to now in local time
-  formDatetime.value = toDatetimeLocal(new Date())
+  editTarget.value = null
+  formData.value.titulo = ''
+  formData.value.foto = ''
+  formData.value.datetime = toDatetimeLocal(new Date())
   confirmDelete.value = false
-  showModal.value    = true
+  showModal.value = true
 }
 
 function openEdit(recuerdo) {
-  editTarget.value    = recuerdo
-  formTitulo.value    = recuerdo.titulo
-  formDatetime.value  = toDatetimeLocal(recuerdo.date)
-  formFoto.value      = recuerdo.foto || ''
+  editTarget.value = recuerdo
+  formData.value.titulo = recuerdo.titulo
+  formData.value.datetime = toDatetimeLocal(recuerdo.date)
+  formData.value.foto = recuerdo.foto || ''
   confirmDelete.value = false
-  showModal.value     = true
+  showModal.value = true
 }
 
 function closeModal() {
-  showModal.value     = false
+  showModal.value = false
   confirmDelete.value = false
 }
 
@@ -121,14 +131,15 @@ function handleBackdropClick(e) {
 }
 
 async function handleSave() {
-  if (!formTitulo.value.trim() || !formDatetime.value) return
+  const { titulo, datetime, foto } = formData.value
+  if (!titulo.trim() || !datetime) return
   saving.value = true
   try {
-    const date = new Date(formDatetime.value)
+    const date = new Date(datetime)
     if (editTarget.value) {
-      await updateRecuerdo(editTarget.value.id, formTitulo.value.trim(), date, formFoto.value)
+      await updateRecuerdo(editTarget.value.id, titulo.trim(), date, foto)
     } else {
-      await addRecuerdo(formTitulo.value.trim(), date, formFoto.value)
+      await addRecuerdo(titulo.trim(), date, foto)
     }
     closeModal()
   } catch (e) {
@@ -281,88 +292,25 @@ function closeImagePreview() {
     </button>
 
     <!-- ── Modal Form ─────────────────────────────────────────────────────── -->
-    <transition name="modal-fade">
-      <div
-        v-if="showModal"
-        class="modal-backdrop"
-        @mousedown="handleBackdropMouseDown"
-        @click="handleBackdropClick"
-      >
-        <div class="modal-card">
-
-          <!-- Modal header -->
-          <div class="modal-header">
-            <h2 class="modal-title">{{ modalTitle }}</h2>
-            <button class="btn-modal-close" @click="closeModal">
-              <Icon icon="mdi:close" />
-            </button>
-          </div>
-
-          <div class="modal-ornament">
-            <span class="orn-line"></span>
-            <span class="modal-heart">♥</span>
-            <span class="orn-line"></span>
-          </div>
-
-          <!-- Form -->
-          <div class="modal-body">
-            <div class="form-group">
-              <label class="form-label">Título del recuerdo</label>
-              <input
-                v-model="formTitulo"
-                type="text"
-                class="form-input"
-                placeholder="Ej: Primera cena juntos..."
-                @keyup.enter="handleSave"
-              />
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Fecha y hora</label>
-              <input
-                v-model="formDatetime"
-                type="datetime-local"
-                class="form-input"
-              />
-            </div>
-
-            <div class="form-group">
-              <label class="form-label">Foto asociable (opcional)</label>
-              <select v-model="formFoto" class="form-select">
-                <option value="">-- Sin foto --</option>
-                <option v-for="foto in availableFotoOptions" :key="foto.value" :value="foto.value">
-                  {{ foto.label }}
-                </option>
-              </select>
-            </div>
-
-            <!-- Preview selected photo -->
-            <div v-if="formFoto && getFotoUrl(formFoto)" class="form-foto-preview">
-              <img :src="getFotoUrl(formFoto)" :alt="formFoto" />
-            </div>
-          </div>
-
-          <!-- Actions -->
-          <div class="modal-actions">
-            <div class="actions-right">
-              <button class="btn-cancel" @click="closeModal" :disabled="saving">
-                Cancelar
-              </button>
-              <button
-                class="btn-save"
-                @click="handleSave"
-                :disabled="saving || !formTitulo.trim() || !formDatetime"
-              >
-                <Icon v-if="saving" icon="mdi:loading" class="spin-icon-sm" />
-                <Icon v-else icon="mdi:content-save-outline" />
-                {{ saving ? 'Guardando...' : 'Guardar' }}
-              </button>
-            </div>
-          </div>
-
+    <!-- ── Dynamic Modal Form ─────────────────────────────────────────────── -->
+    <DynamicFormModal
+      :show="showModal"
+      :title="modalTitle"
+      :schema="modalSchema"
+      v-model="formData"
+      :loading="saving"
+      saveText="Guardar"
+      saveIcon="mdi:heart"
+      @close="closeModal"
+      @save="handleSave"
+    >
+      <template #field-preview>
+        <!-- Preview selected photo -->
+        <div v-if="formData.foto && getFotoUrl(formData.foto)" class="form-foto-preview">
+          <img :src="getFotoUrl(formData.foto)" :alt="formData.foto" />
         </div>
-      </div>
-    </transition>
+      </template>
+    </DynamicFormModal>
 
     <!-- ── Lightbox Modal Preview (Solo la foto) ───────────────────────── -->
     <transition name="modal-fade">
@@ -744,7 +692,7 @@ function closeImagePreview() {
   z-index: 50;
   width: 52px;
   height: 52px;
-  border-radius: 50%;
+  border-radius: 14px;
   background: var(--theme-btn-gradient);
   border: none;
   color: #fff9f5;
@@ -762,135 +710,7 @@ function closeImagePreview() {
 }
 .fab:active { transform: scale(0.96); }
 
-/* ── Modal ────────────────────────────────────────────────────────────────── */
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 300;
-  background: rgba(50, 30, 15, 0.5);
-  backdrop-filter: blur(3px);
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  padding: 0;
-}
-
-@media (min-width: 480px) {
-  .modal-backdrop {
-    align-items: center;
-    padding: 1rem;
-  }
-}
-
-.modal-card {
-  background: var(--theme-drawer-bg);
-  border: 1.5px solid var(--theme-card-border);
-  border-radius: 12px 12px 0 0;
-  width: 100%;
-  max-width: 480px;
-  box-shadow: 0 -8px 40px rgba(0, 0, 0, 0.3);
-  overflow: hidden;
-  position: relative;
-  z-index: 310;
-  transition: background 0.4s ease, border-color 0.4s ease;
-}
-
-@media (min-width: 480px) {
-  .modal-card { border-radius: 8px; }
-}
-
-.modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1.5rem 1.5rem 1rem;
-}
-.modal-title {
-  font-family: 'Cause', 'Georgia', serif;
-  font-size: 1.3rem;
-  font-weight: 700;
-  color: var(--theme-text-main);
-  margin: 0;
-}
-.btn-modal-close {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 1.2rem;
-  color: var(--theme-text-muted);
-  display: flex;
-  align-items: center;
-  padding: 4px;
-  border-radius: 6px;
-  transition: color 0.2s, transform 0.2s;
-}
-.btn-modal-close:hover { color: var(--theme-primary); transform: rotate(90deg); }
-
-.modal-ornament {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0 1.5rem 0.75rem;
-}
-.modal-heart {
-  color: var(--theme-primary);
-  font-size: 0.7rem;
-}
-
-.modal-body {
-  padding: 0.25rem 1.5rem 1.25rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-.form-label {
-  font-family: 'Cause', system-ui, sans-serif;
-  font-size: 0.78rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: var(--theme-text-muted);
-  font-weight: 700;
-}
-.form-input {
-  background: var(--theme-card-bg);
-  border: 1.5px solid var(--theme-card-border);
-  border-radius: 6px;
-  padding: 0.7rem 0.9rem;
-  font-size: 0.95rem;
-  font-family: 'Cause', system-ui, sans-serif;
-  color: var(--theme-text-main);
-  outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
-  width: 100%;
-}
-.form-input:focus {
-  border-color: var(--theme-primary);
-  box-shadow: 0 0 0 3px var(--theme-badge-bg);
-}
-
-.form-select {
-  background: var(--theme-card-bg);
-  border: 1.5px solid var(--theme-card-border);
-  border-radius: 6px;
-  padding: 0.7rem 0.9rem;
-  font-size: 0.95rem;
-  font-family: 'Cause', system-ui, sans-serif;
-  color: var(--theme-text-main);
-  outline: none;
-  transition: border-color 0.2s, box-shadow 0.2s;
-  width: 100%;
-  cursor: pointer;
-}
-.form-select:focus {
-  border-color: var(--theme-primary);
-  box-shadow: 0 0 0 3px var(--theme-badge-bg);
-}
+/* ── Modal classes removed (now in DynamicFormModal) ── */
 
 .form-foto-preview {
   margin-top: 0.4rem;
@@ -939,109 +759,4 @@ function closeImagePreview() {
   transform: scale(1.01);
 }
 
-/* ── Modal Actions Layout Fix ── */
-.modal-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  padding: 0.75rem 1.5rem 1.5rem;
-}
-.actions-right {
-  display: flex;
-  gap: 0.65rem;
-  width: 100%;
-}
-
-.btn-cancel {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  white-space: nowrap;
-  background: none;
-  border: 1.5px solid var(--theme-card-border);
-  border-radius: 6px;
-  padding: 0.65rem 1.1rem;
-  font-family: 'Cause', system-ui, sans-serif;
-  font-size: 0.875rem;
-  color: var(--theme-text-body);
-  cursor: pointer;
-  transition: background 0.2s;
-}
-.btn-cancel:hover { background: var(--theme-badge-bg); }
-
-.btn-save {
-  flex: 1.2;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  white-space: nowrap;
-  min-width: 130px;
-  gap: 0.4rem;
-  background: var(--theme-btn-gradient);
-  border: none;
-  border-radius: 6px;
-  padding: 0.65rem 1.2rem;
-  font-family: 'Cause', system-ui, sans-serif;
-  font-size: 0.875rem;
-  font-weight: 700;
-  color: #fff9f5;
-  cursor: pointer;
-  transition: opacity 0.2s, transform 0.2s;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
-}
-.btn-save:hover:not(:disabled) { opacity: 0.92; }
-.btn-save:disabled { opacity: 0.45; cursor: not-allowed; }
-
-.btn-delete {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  white-space: nowrap;
-  gap: 0.4rem;
-  background: none;
-  border: 1.5px solid var(--theme-primary);
-  border-radius: 6px;
-  padding: 0.65rem 0.9rem;
-  font-family: 'Cause', system-ui, sans-serif;
-  font-size: 0.85rem;
-  color: var(--theme-primary);
-  cursor: pointer;
-  transition: background 0.2s, border-color 0.2s, color 0.2s;
-}
-.btn-delete:hover { background: var(--theme-badge-bg); }
-.btn-delete.confirm {
-  background: var(--theme-primary);
-  color: #fff9f5;
-  border-color: var(--theme-primary);
-  animation: shake 0.4s ease;
-}
-
-.spin-icon-sm { animation: spin 1s linear infinite; font-size: 1rem; }
-
-/* ── Transitions ──────────────────────────────────────────────────────────── */
-.modal-fade-enter-active,
-.modal-fade-leave-active {
-  transition: opacity 0.25s ease;
-}
-.modal-fade-enter-active .modal-card,
-.modal-fade-leave-active .modal-card {
-  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.modal-fade-enter-from { opacity: 0; }
-.modal-fade-enter-from .modal-card { transform: translateY(40px); }
-.modal-fade-leave-to { opacity: 0; }
-.modal-fade-leave-to .modal-card { transform: translateY(40px); }
-
-/* ── Keyframes ────────────────────────────────────────────────────────────── */
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
-}
-@keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-4px); }
-  75% { transform: translateX(4px); }
-}
 </style>

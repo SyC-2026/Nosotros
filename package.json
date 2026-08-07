@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@iconify/vue": "^5.0.1",
+    "canvas-confetti": "^1.9.4",
     "firebase": "^12.17.1",
     "leaflet": "^1.9.4",
     "pinia": "^3.0.1",

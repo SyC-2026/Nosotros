@@ -32,8 +32,7 @@ export function useCartas() {
           ...data,
           titulo:    data.titulo    || 'Sin título',
           contenido: data.contenido || '',
-          de:        data.de        || '',
-          para:      data.para      || '',
+          autor:     data.autor || data.de || '',
           date:      data.date?.toDate?.() ?? null,
         }
       })
@@ -48,23 +47,21 @@ export function useCartas() {
 
   onUnmounted(unsubscribe)
 
-  async function addCarta(titulo, contenido, de, para, date) {
+  async function addCarta(titulo, contenido, autor, date) {
     await addDoc(collection(db, 'cartas'), {
       titulo,
       contenido,
-      de,
-      para,
+      autor,
       date:      date      ? Timestamp.fromDate(date) : null,
       createdAt: Timestamp.now(),
     })
   }
 
-  async function updateCarta(id, titulo, contenido, de, para, date) {
+  async function updateCarta(id, titulo, contenido, autor, date) {
     await updateDoc(doc(db, 'cartas', id), {
       titulo,
       contenido,
-      de,
-      para,
+      autor,
       date: date ? Timestamp.fromDate(date) : null,
     })
   }

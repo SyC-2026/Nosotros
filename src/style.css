@@ -76,6 +76,28 @@ body.theme-santi {
       rgba(184, 125, 75, 0.08) 100%);
 }
 
+body.theme-celebration {
+  /* Celebration Theme (Gold, Festive Rose, Joyful) */
+  --theme-primary: #d4af37;
+  --theme-secondary: #f0a868;
+  --theme-text-main: #5c4300;
+  --theme-text-muted: #8c7333;
+  --theme-text-body: #73591a;
+  --theme-card-bg: rgba(255, 252, 240, 0.92);
+  --theme-card-border: rgba(212, 175, 55, 0.4);
+  --theme-bg-gradient: linear-gradient(160deg,
+      rgba(255, 250, 230, 0.90) 0%,
+      rgba(253, 245, 215, 0.84) 60%,
+      rgba(255, 240, 200, 0.90) 100%);
+  --theme-btn-gradient: linear-gradient(135deg, #d4af37 0%, #b5952f 100%);
+  --theme-badge-bg: rgba(212, 175, 55, 0.15);
+  --theme-badge-border: rgba(212, 175, 55, 0.35);
+  --theme-drawer-bg: #fffbf0;
+  --theme-drawer-header-bg: linear-gradient(135deg,
+      rgba(212, 175, 55, 0.15) 0%,
+      rgba(240, 168, 104, 0.1) 100%);
+}
+
 body {
   font-family: 'Lato', system-ui, -apple-system, sans-serif;
   background-color: #fdf6ec;

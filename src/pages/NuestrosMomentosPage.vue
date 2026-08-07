@@ -62,6 +62,19 @@ const editTitleInput = ref('')
 const editDateInput = ref('')
 const editAlbumIdInput = ref('none')
 
+// ── Date formatter ────────────────────────────────────────────────────────────
+const dateFormatter = new Intl.DateTimeFormat('es-ES', {
+  weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+})
+function formatDate(dateStr) {
+  if (!dateStr || dateStr === 'Local') return dateStr
+  // Use T12:00:00 to avoid timezone shifting
+  const dateObj = new Date(dateStr.includes('T') ? dateStr : `${dateStr}T12:00:00`)
+  if (isNaN(dateObj.getTime())) return dateStr
+  const d = dateFormatter.format(dateObj)
+  return d.charAt(0).toUpperCase() + d.slice(1)
+}
+
 function openEditPhoto(item) {
   if (item.isLocal) return
   editPhotoId.value = item.id
@@ -228,7 +241,9 @@ function closeLightbox() {
         <span class="orn-line"></span>
       </div>
 
-      <!-- Albums Section -->
+      <!-- Gallery Layout (Sidebar + Masonry) -->
+      <div class="gallery-layout">
+        <!-- Albums Section -->
       <div class="albums-section">
         <div class="albums-header">
           <span class="albums-section-title">
@@ -266,7 +281,7 @@ function closeLightbox() {
               <Icon icon="mdi:folder-heart-outline" />
             </div>
             <span class="album-card-name">{{ album.name }}</span>
-            <span class="album-card-count">{{ momentos.filter(m =&gt; m.albumId === album.id).length }}</span>
+            <span class="album-card-count">{{ momentos.filter(m => m.albumId === album.id).length }}</span>
             <button
               class="album-card-delete"
               @click.stop="handleDeleteAlbum(album)"
@@ -306,12 +321,13 @@ function closeLightbox() {
             <div class="card-overlay">
               <span v-if="item.title" class="card-title">{{ item.title }}</span>
               <span v-if="item.date" class="card-date">
-                <Icon icon="mdi:calendar-heart" class="card-date-icon" />{{ item.date }}
+                <Icon icon="mdi:calendar-heart" class="card-date-icon" />{{ formatDate(item.date) }}
               </span>
             </div>
           </div>
         </div>
       </main>
+      </div> <!-- End Gallery Layout -->
 
     </div>
 
@@ -417,9 +433,9 @@ function closeLightbox() {
     <transition name="modal-fade">
       <div v-if="activeLightboxItem" class="lightbox-backdrop" @click.self="closeLightbox">
         <div class="lightbox-content">
-          <button class="btn-close-lightbox" @click="closeLightbox">
+          <!-- <button class="btn-close-lightbox" @click="closeLightbox">
             <Icon icon="mdi:close" />
-          </button>
+          </button> -->
 
           <div class="lightbox-image-container">
             <img :src="activeLightboxItem.url" :alt="activeLightboxItem.title" />
@@ -429,28 +445,26 @@ function closeLightbox() {
             <div class="lightbox-text">
               <h3 v-if="activeLightboxItem.title">{{ activeLightboxItem.title }}</h3>
               <p v-if="activeLightboxItem.date" class="lightbox-date">
-                <Icon icon="mdi:calendar-heart" /> {{ activeLightboxItem.date }}
+                <Icon icon="mdi:calendar-heart" /> {{ formatDate(activeLightboxItem.date) }}
               </p>
             </div>
 
             <div v-if="!activeLightboxItem.isLocal" class="lightbox-actions">
               <button
-                class="btn-edit-photo"
+                class="btn-card-action"
                 @click="openEditPhoto(activeLightboxItem)"
                 title="Editar foto"
               >
                 <Icon icon="mdi:pencil-outline" />
-                <span>Editar</span>
               </button>
 
               <button
-                class="btn-delete"
-                :class="{ confirming: deletingPhotoId === activeLightboxItem.id }"
+                class="btn-card-action btn-card-delete"
+                :class="{ confirm: deletingPhotoId === activeLightboxItem.id }"
                 @click="handleDelete(activeLightboxItem)"
                 :title="deletingPhotoId === activeLightboxItem.id ? 'Toca de nuevo para confirmar' : 'Eliminar foto'"
               >
                 <Icon :icon="deletingPhotoId === activeLightboxItem.id ? 'mdi:alert-circle' : 'mdi:trash-can-outline'" />
-                <span>{{ deletingPhotoId === activeLightboxItem.id ? '¿Confirmar?' : 'Eliminar' }}</span>
               </button>
             </div>
           </div>
@@ -565,7 +579,7 @@ function closeLightbox() {
   z-index: 50;
   width: 52px;
   height: 52px;
-  border-radius: 50%;
+  border-radius: 14px;
   background: var(--theme-btn-gradient);
   border: none;
   color: #fff9f5;
@@ -599,11 +613,25 @@ function closeLightbox() {
   letter-spacing: 0.2em;
 }
 
+/* Gallery Layout */
+.gallery-layout {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 1.5rem;
+  width: 100%;
+  margin-top: 0.5rem;
+}
+
 /* Albums Section */
 .albums-section {
+  width: 220px;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   gap: 0.65rem;
+  position: sticky;
+  top: 1rem;
 }
 
 .albums-header {
@@ -646,120 +674,131 @@ function closeLightbox() {
 
 .albums-row {
   display: flex;
-  gap: 0.75rem;
-  overflow-x: auto;
-  padding-bottom: 0.4rem;
+  flex-direction: column;
+  gap: 0.6rem;
+  overflow-y: auto;
+  max-height: calc(100vh - 200px);
   scrollbar-width: none;
+  /* Use larger padding and negative margin to prevent large shadow clipping */
+  padding: 1.5rem;
+  margin: -1.5rem;
 }
 .albums-row::-webkit-scrollbar { display: none; }
 
-/* Album card */
+/* Album card (Chips / Pills) */
 .album-card {
+  width: 100%;
+  justify-content: flex-start;
   flex: 0 0 auto;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 0.3rem;
-  padding: 0.9rem 0.85rem 0.7rem;
-  min-width: 88px;
+  gap: 0.45rem;
+  padding: 0.45rem 1rem 0.45rem 0.65rem;
   background: var(--theme-card-bg);
-  border: 1.5px solid var(--theme-card-border);
-  border-radius: 16px;
+  border: 1px solid var(--theme-card-border);
+  border-radius: 30px;
   cursor: pointer;
   position: relative;
-  transition: transform 0.25s ease, box-shadow 0.25s ease, background 0.2s ease, border-color 0.2s ease;
-  text-align: center;
-  backdrop-filter: blur(6px);
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
 }
 .album-card:hover {
+  background: rgba(255, 255, 255, 0.8);
   border-color: var(--theme-primary);
   transform: translateY(-2px);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
 }
 .album-card.active {
   background: var(--theme-primary);
   border-color: var(--theme-primary);
   transform: translateY(-2px);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.16);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
 }
 .album-card.confirming {
   border-color: #e53e3e;
+  animation: shake 0.35s ease;
 }
 
 .album-card-icon {
-  font-size: 1.7rem;
+  font-size: 1.35rem;
   color: var(--theme-primary);
-  line-height: 1;
-  transition: color 0.2s ease;
+  display: flex;
+  align-items: center;
+  transition: color 0.3s ease;
 }
 .album-card.active .album-card-icon {
-  color: rgba(255, 255, 255, 0.92);
+  color: rgba(255, 255, 255, 0.95);
 }
 
 .album-card-name {
   font-family: 'Cause', 'Georgia', serif;
-  font-size: 0.8rem;
-  font-weight: 600;
+  font-size: 0.95rem;
+  font-weight: 700;
   color: var(--theme-text-main);
   white-space: nowrap;
-  max-width: 86px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.2;
-  transition: color 0.2s ease;
+  transition: color 0.3s ease;
 }
 .album-card.active .album-card-name {
   color: white;
 }
 
 .album-card-count {
-  font-size: 0.68rem;
-  padding: 0.08rem 0.45rem;
+  margin-left: auto;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.1rem 0.45rem;
   background: var(--theme-badge-bg);
-  border-radius: 10px;
+  border-radius: 12px;
   color: var(--theme-text-muted);
-  transition: all 0.2s ease;
+  transition: all 0.3s ease;
+  margin-left: 0.1rem;
 }
 .album-card.active .album-card-count {
-  background: rgba(255, 255, 255, 0.22);
-  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.25);
+  color: white;
 }
 
-/* Botón borrar: aparece solo en hover */
+/* Botón borrar: tipo badge flotante */
 .album-card-delete {
   position: absolute;
-  top: 0.3rem;
-  right: 0.3rem;
-  width: 18px;
-  height: 18px;
+  top: -6px;
+  right: -4px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
-  background: transparent;
-  border: none;
+  background: var(--theme-card-bg);
+  border: 1px solid var(--theme-card-border);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.7rem;
+  font-size: 0.8rem;
   color: var(--theme-text-muted);
   cursor: pointer;
   opacity: 0;
-  transition: all 0.2s ease;
+  transform: scale(0.6);
+  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
   padding: 0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  z-index: 5;
 }
 .album-card:hover .album-card-delete,
 .album-card.active .album-card-delete {
-  opacity: 0.6;
-}
-.album-card.active .album-card-delete {
-  color: rgba(255, 255, 255, 0.75);
+  opacity: 1;
+  transform: scale(1);
 }
 .album-card-delete:hover {
-  background: rgba(229, 62, 62, 0.18) !important;
+  background: rgba(229, 62, 62, 0.15) !important;
   color: #e53e3e !important;
-  opacity: 1 !important;
+  border-color: #e53e3e;
 }
 .album-card.confirming .album-card-delete {
-  color: #e53e3e;
-  opacity: 1;
+  background: #e53e3e;
+  color: white !important;
+  border-color: #e53e3e;
+  transform: scale(1.1);
 }
 
 /* Loading & Empty States */
@@ -800,6 +839,10 @@ function closeLightbox() {
 }
 
 /* Gallery Masonry */
+.page-content {
+  flex: 1;
+  min-width: 0; /* Prevents flex children from overflowing */
+}
 .gallery-masonry {
   columns: 3;
   column-gap: 1.25rem;
@@ -1095,47 +1138,33 @@ function closeLightbox() {
 .lightbox-actions {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
+  gap: 0.2rem;
 }
-.btn-edit-photo {
-  background: var(--theme-badge-bg);
+.btn-card-action {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.25rem;
+  color: var(--theme-text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 6px;
+  transition: color 0.2s ease, background 0.2s ease, transform 0.15s ease;
+}
+.btn-card-action:hover {
   color: var(--theme-primary);
-  border: 1px solid var(--theme-badge-border);
-  padding: 0.5rem 1rem;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  cursor: pointer;
-  font-size: 0.9rem;
-  transition: background 0.2s ease, color 0.2s ease;
+  background: var(--theme-badge-bg);
 }
-.btn-edit-photo:hover {
-  background: var(--theme-primary);
-  color: white;
-}
-.btn-delete {
-  background: #fff0f0;
+.btn-card-delete:hover {
   color: #e53e3e;
-  border: 1px solid #feb2b2;
-  padding: 0.5rem 1rem;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  cursor: pointer;
-  font-size: 0.9rem;
-  transition: all 0.2s ease;
 }
-.btn-delete:hover {
-  background: #e53e3e;
-  color: white;
+.btn-card-delete.confirm {
+  color: #e53e3e;
+  background: rgba(229, 62, 62, 0.15);
 }
-.btn-delete.confirming {
-  background: #e53e3e;
-  color: white;
-  border-color: #e53e3e;
-}
+
 .btn-delete-album.confirming {
   color: #e53e3e;
   opacity: 1;
@@ -1147,5 +1176,27 @@ function closeLightbox() {
 }
 .modal-fade-enter-from, .modal-fade-leave-to {
   opacity: 0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .gallery-layout {
+    flex-direction: column;
+  }
+  .albums-section {
+    width: 100%;
+    position: static;
+  }
+  .albums-row {
+    flex-direction: row;
+    overflow-x: auto;
+    overflow-y: hidden;
+    max-height: none;
+    padding: 1.5rem;
+    margin: -1.5rem;
+  }
+  .album-card {
+    width: auto;
+  }
 }
 </style>

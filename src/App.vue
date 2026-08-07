@@ -1,10 +1,11 @@
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRelationshipStore } from './stores/relationship.js'
 import { useSiteConfig } from './composables/useSiteConfig.js'
 import LockScreen from './components/LockScreen.vue'
 import MainLayout from './components/MainLayout.vue'
 import MaintenancePage from './components/MaintenancePage.vue'
+import confetti from 'canvas-confetti'
 
 // Imágenes servidas desde /public/ — no se bundlean, carga lazy por el navegador
 const base = import.meta.env.BASE_URL
@@ -16,6 +17,15 @@ const bgList = [
 const currentBgIndex = ref(0)
 let bgInterval = null
 
+const store = useRelationshipStore()
+const isUnlocked = computed(() => store.isUnlocked)
+
+watch(isUnlocked, (newVal, oldVal) => {
+  if (newVal && !oldVal && store.isCelebrationDay) {
+    triggerConfetti()
+  }
+})
+
 onMounted(() => {
   if (bgList.length > 1) {
     // Cambiar fondo automáticamente cada 7 segundos
@@ -23,14 +33,45 @@ onMounted(() => {
       currentBgIndex.value = (currentBgIndex.value + 1) % bgList.length
     }, 7000)
   }
+
+  // Trigger confetti si es día de celebración (14 de cada mes) y está desbloqueado
+  if (store.isCelebrationDay && isUnlocked.value) {
+    triggerConfetti()
+  }
 })
+
+function triggerConfetti() {
+  const duration = 5 * 1000 // 5 segundos de confetti
+  const animationEnd = Date.now() + duration
+  const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 9999 }
+
+  function randomInRange(min, max) {
+    return Math.random() * (max - min) + min
+  }
+
+  const interval = setInterval(function() {
+    const timeLeft = animationEnd - Date.now()
+
+    if (timeLeft <= 0) {
+      return clearInterval(interval)
+    }
+
+    const particleCount = 40 * (timeLeft / duration)
+    // Tira confetti desde ambos lados de la pantalla
+    confetti(Object.assign({}, defaults, { 
+      particleCount, 
+      origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } 
+    }))
+    confetti(Object.assign({}, defaults, { 
+      particleCount, 
+      origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } 
+    }))
+  }, 250)
+}
 
 onUnmounted(() => {
   if (bgInterval) clearInterval(bgInterval)
 })
-
-const store = useRelationshipStore()
-const isUnlocked = computed(() => store.isUnlocked)
 
 const { maintenanceMode } = useSiteConfig()
 
