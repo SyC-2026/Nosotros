@@ -2327,4 +2327,4 @@ ${this.customData.serverResponse}`:this.message=this._baseMessage}}var Ne;(funct
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */function dD(r,{instanceIdentifier:t}){const e=r.getProvider("app").getImmediate(),n=r.getProvider("auth-internal"),s=r.getProvider("app-check-internal");return new pD(e,n,s,t,tc)}function mD(){zr(new nr(iC,dD,"PUBLIC").setMultipleInstances(!0)),tn(Gl,Hl,""),tn(Gl,Hl,"esm2020")}mD();export{It as T,SD as a,vD as b,ID as c,Fd as d,OD as e,FD as f,yD as g,rp as i,ND as o,RD as q,TD as s,PD as u};
+ */function dD(r,{instanceIdentifier:t}){const e=r.getProvider("app").getImmediate(),n=r.getProvider("auth-internal"),s=r.getProvider("app-check-internal");return new pD(e,n,s,t,tc)}function mD(){zr(new nr(iC,dD,"PUBLIC").setMultipleInstances(!0)),tn(Gl,Hl,""),tn(Gl,Hl,"esm2020")}mD();export{It as T,SD as a,ND as b,ID as c,Fd as d,OD as e,FD as f,yD as g,rp as i,vD as o,RD as q,TD as s,PD as u};
