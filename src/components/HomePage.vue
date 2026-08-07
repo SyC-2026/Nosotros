@@ -6,11 +6,14 @@ import { useFrases } from '../composables/useFrases.js'
 import { Icon } from '@iconify/vue'
 
 import { useMomentos } from '../composables/useMomentos.js'
+import { useEventos } from '../composables/useEventos.js'
+import { getNow } from '../utils/debug.js'
 
 const store = useRelationshipStore()
 const nav = useNavigationStore()
 const { getRandomFrase } = useFrases()
 const { momentos } = useMomentos()
+const { eventos } = useEventos()
 
 const currentQuote = ref(getRandomFrase())
 
@@ -27,7 +30,15 @@ const localFotosList = Object.values(fotoModules)
 
 const fotosList = computed(() => {
   const dbUrls = momentos.value.map((m) => m.url).filter(Boolean)
-  return [...dbUrls, ...localFotosList]
+  const allFotos = [...dbUrls, ...localFotosList]
+  
+  // Shuffle fotos
+  for (let i = allFotos.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [allFotos[i], allFotos[j]] = [allFotos[j], allFotos[i]]
+  }
+  
+  return allFotos
 })
 
 const currentPhotoIndex = ref(0)
@@ -58,49 +69,56 @@ function handleLock() {
   store.lock()
 }
 
-// Next Event Logic
-const nextSantiBday = computed(() => {
-  const now = new Date()
-  let year = now.getFullYear()
-  let target = new Date(year, 8, 7, 0, 0, 0)
-  if (now > target) target = new Date(year + 1, 8, 7, 0, 0, 0)
-  return target
-})
-
-const nextCamiBday = computed(() => {
-  const now = new Date()
-  let year = now.getFullYear()
-  let target = new Date(year, 10, 28, 0, 0, 0)
-  if (now > target) target = new Date(year + 1, 10, 28, 0, 0, 0)
-  return target
-})
-
-const nextCumpleMes = computed(() => {
-  const now = new Date()
-  let year = now.getFullYear()
-  let month = now.getMonth()
-  let target = new Date(year, month, 14, 0, 0, 0)
-  if (now > target) target = new Date(year, month + 1, 14, 0, 0, 0)
-  return target
-})
-
-const nextAniversario = computed(() => {
-  const now = new Date()
-  let year = now.getFullYear()
-  let target = new Date(year, 6, 14, 0, 0, 0) // July 14
-  if (now > target) target = new Date(year + 1, 6, 14, 0, 0, 0)
-  return target
-})
-
 const closestEvent = computed(() => {
-  const events = [
-    { name: 'Cumple Mes', target: nextCumpleMes.value, icon: 'mdi:heart-flash' },
-    { name: 'Aniversario', target: nextAniversario.value, icon: 'mdi:glass-toast' },
-    { name: 'Cumple de Santi', target: nextSantiBday.value, icon: 'mdi:cake-variant-outline' },
-    { name: 'Cumple de Cami', target: nextCamiBday.value, icon: 'mdi:cake-variant-outline' }
-  ]
-  events.sort((a, b) => a.target - b.target)
-  return events[0]
+  if (!eventos.value || eventos.value.length === 0) return null
+
+  const now = getNow()
+  let upcoming = []
+
+  for (const evt of eventos.value) {
+    if (!evt.fecha) continue
+
+    const evtDate = evt.fecha
+    let target = null
+
+    if (evt.tipo === 'Mensualmente') {
+      let year = now.getFullYear()
+      let month = now.getMonth()
+      target = new Date(year, month, evtDate.getDate(), 0, 0, 0)
+      let endOfDay = new Date(year, month, evtDate.getDate(), 23, 59, 59, 999)
+      if (now > endOfDay) {
+        target = new Date(year, month + 1, evtDate.getDate(), 0, 0, 0)
+      }
+    } else if (evt.tipo === 'Anualmente') {
+      let year = now.getFullYear()
+      target = new Date(year, evtDate.getMonth(), evtDate.getDate(), 0, 0, 0)
+      let endOfDay = new Date(year, evtDate.getMonth(), evtDate.getDate(), 23, 59, 59, 999)
+      if (now > endOfDay) {
+        target = new Date(year + 1, evtDate.getMonth(), evtDate.getDate(), 0, 0, 0)
+      }
+    } else {
+      // Fecha unica
+      target = new Date(evtDate.getFullYear(), evtDate.getMonth(), evtDate.getDate(), 0, 0, 0)
+      let endOfDay = new Date(evtDate.getFullYear(), evtDate.getMonth(), evtDate.getDate(), 23, 59, 59, 999)
+      if (now > endOfDay) continue
+    }
+
+    if (target) {
+      const isToday = now.getDate() === target.getDate() && now.getMonth() === target.getMonth() && now.getFullYear() === target.getFullYear()
+      
+      upcoming.push({
+        name: evt.titulo || 'Evento',
+        target: target,
+        icon: evt.icon || 'mdi:calendar-star',
+        isToday: isToday
+      })
+    }
+  }
+
+  if (upcoming.length === 0) return null
+
+  upcoming.sort((a, b) => a.target - b.target)
+  return upcoming[0]
 })
 
 const targetDateFormatted = computed(() => {
@@ -118,7 +136,12 @@ const timeRemaining = ref({ days: 0, hours: 0, mins: 0, secs: 0 })
 let countdownTimer = null
 
 function updateCountdown() {
-  const now = new Date()
+  if (!closestEvent.value) {
+    timeRemaining.value = { days: 0, hours: 0, mins: 0, secs: 0 }
+    return
+  }
+
+  const now = getNow()
   const diff = closestEvent.value.target - now
 
   if (diff <= 0) {
@@ -218,15 +241,29 @@ const pad = (num) => String(num).padStart(2, '0')
       <div class="widget w-event">
         <!-- Ícono watermark de fondo -->
         <div class="event-bg-icon" aria-hidden="true">
-          <Icon icon="mdi:calendar-heart" />
+          <Icon :icon="(closestEvent && closestEvent.isToday) ? 'mdi:party-popper' : 'mdi:calendar-month-outline'" />
         </div>
         
-        <div class="event-titles">
-          <span class="event-subtitle">Próximo Evento: <strong>¡{{ closestEvent.name }}!</strong></span>
-          <h3 class="event-target-date">{{ targetDateFormatted }}</h3>
-        </div>
+        <template v-if="closestEvent && closestEvent.isToday">
+          <div class="today-celebration-widget">
+            <Icon :icon="closestEvent.icon || 'mdi:party-popper'" class="today-main-icon pulse-animation" />
+            <h3 class="today-main-title">¡Feliz {{ closestEvent.name }}!</h3>
+            <p class="today-sub-text">Hoy es un día muy especial para celebrar juntos.</p>
+          </div>
+        </template>
+        
+        <template v-else>
+          <div class="event-titles">
+            <span class="event-subtitle">
+              <template v-if="closestEvent">
+                Próximo Evento: <strong>¡{{ closestEvent.name }}!</strong>
+              </template>
+              <strong v-else>No hay próximos eventos</strong>
+            </span>
+            <h3 class="event-target-date" v-if="closestEvent">{{ targetDateFormatted }}</h3>
+          </div>
 
-        <div class="countdown-display">
+          <div class="countdown-display" v-if="closestEvent">
           <div class="cd-group">
             <div class="cd-pill">{{ pad(timeRemaining.days) }}</div>
             <span class="cd-label">Días</span>
@@ -246,7 +283,8 @@ const pad = (num) => String(num).padStart(2, '0')
             <div class="cd-pill">{{ pad(timeRemaining.secs) }}</div>
             <span class="cd-label">Segundos</span>
           </div>
-        </div>
+          </div>
+        </template>
       </div>
 
       <!-- Widget: Navigation - Lugares -->
@@ -683,6 +721,45 @@ const pad = (num) => String(num).padStart(2, '0')
   color: var(--theme-text-muted);
   padding-top: clamp(0.25rem, 0.8vw, 0.5rem);
   opacity: 0.6;
+}
+
+/* Celebration Today Styles */
+.today-celebration-widget {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  height: 100%;
+  text-align: center;
+  z-index: 2;
+}
+.today-main-icon {
+  font-size: clamp(3rem, 6vw, 4.5rem);
+  color: var(--theme-primary);
+  filter: drop-shadow(0 4px 10px rgba(0,0,0,0.15));
+}
+.today-main-title {
+  font-family: 'Cause', 'Georgia', serif;
+  font-size: clamp(1.4rem, 3vw, 2.2rem);
+  color: var(--theme-text-main);
+  margin: 0;
+  line-height: 1.1;
+}
+.today-sub-text {
+  font-family: 'Lato', system-ui, sans-serif;
+  font-size: clamp(0.75rem, 1.5vw, 0.9rem);
+  color: var(--theme-text-muted);
+  margin: 0;
+  opacity: 0.9;
+}
+.pulse-animation {
+  animation: pulse-soft 2s infinite ease-in-out;
+}
+@keyframes pulse-soft {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
 }
 
 /* Nav Internals */

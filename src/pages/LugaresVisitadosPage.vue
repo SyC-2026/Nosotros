@@ -7,6 +7,7 @@ import { useLugares } from '../composables/useLugares.js'
 import { useMomentos } from '../composables/useMomentos.js'
 import BackButton from '../components/BackButton.vue'
 import DynamicFormModal from '../components/DynamicFormModal.vue'
+import LightboxModal from '../components/LightboxModal.vue'
 
 const { lugares, loading, error, addLugar, updateLugar, deleteLugar } = useLugares()
 const { momentos } = useMomentos()
@@ -425,7 +426,7 @@ function closeGeoResults() {
 
       <!-- Loading State -->
       <div v-if="loading" class="state-box">
-        <Icon icon="mdi:loading" class="spin-icon" />
+        <Icon icon="line-md:loading-loop" class="spin-icon" />
         <p>Cargando mapa y lugares...</p>
       </div>
 
@@ -582,11 +583,12 @@ function closeGeoResults() {
     </DynamicFormModal>
 
     <!-- ── Lightbox Preview ───────────────────────────────────────────────── -->
-    <transition name="modal-fade">
-      <div v-if="previewImage" class="lightbox-backdrop" @click="closeImagePreview">
-        <img :src="previewImage.url" :alt="previewImage.title" class="lightbox-img" />
-      </div>
-    </transition>
+    <LightboxModal
+      :show="!!previewImage"
+      :imageUrl="previewImage?.url || ''"
+      :title="previewImage?.title || ''"
+      @close="closeImagePreview"
+    />
 
   </div>
 </template>
@@ -1008,29 +1010,6 @@ function closeGeoResults() {
   border-radius: 4px;
 }
 .btn-edit:hover { color: var(--theme-primary); }
-
-/* Lightbox */
-.lightbox-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 400;
-  background: rgba(15, 10, 5, 0.92);
-  backdrop-filter: blur(8px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1.5rem;
-  cursor: pointer;
-}
-.lightbox-img {
-  max-width: 92vw;
-  max-height: 90vh;
-  object-fit: contain;
-  border-radius: 8px;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.7);
-  border: 2px solid var(--theme-card-border);
-}
-
 /* Geocoder */
 .geo-search-wrap {
   position: relative;

@@ -132,7 +132,7 @@ function updateField(key, value) {
 .modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 300;
+  z-index: 1100;
   background: rgba(0, 0, 0, 0.55);
   backdrop-filter: blur(4px);
   display: flex;

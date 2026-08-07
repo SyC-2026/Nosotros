@@ -1,4 +1,5 @@
 import { ref, onMounted, onUnmounted } from 'vue'
+import axios from 'axios'
 import { db } from '../firebase.js'
 import {
   collection,
@@ -12,15 +13,6 @@ import {
   doc
 } from 'firebase/firestore'
 
-// Utility function to convert original image file directly to Base64 preserving 100% exact quality
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = (e) => resolve(e.target.result)
-    reader.onerror = (err) => reject(err)
-    reader.readAsDataURL(file)
-  })
-}
 
 export function useMomentos() {
   const momentos = ref([])
@@ -93,16 +85,47 @@ export function useMomentos() {
     if (!file) return
 
     uploading.value = true
-    uploadProgress.value = 30
+    uploadProgress.value = 0
     error.value = null
 
     try {
-      // Compress and convert image to Base64
-      const base64Data = await fileToBase64(file)
-      uploadProgress.value = 75
+      const apiKey = import.meta.env.VITE_FIVEMANAGE_API_TOKEN
+      if (!apiKey || apiKey === 'YOUR_API_TOKEN') {
+        throw new Error('API Token de Fivemanage no configurado en .env')
+      }
 
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('filename', file.name)
+      formData.append('path', 'nosotros/galeria')
+      formData.append('metadata', JSON.stringify({
+        title: metadata.title || '',
+        description: metadata.description || '',
+        albumId: metadata.albumId || 'local',
+      }))
+
+      // Upload file to Fivemanage
+      const res = await axios.post('https://api.fivemanage.com/api/v3/file', formData, {
+        headers: {
+          Authorization: apiKey,
+        },
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            const percentCompleted = Math.round((progressEvent.loaded * 95) / progressEvent.total)
+            uploadProgress.value = percentCompleted
+          }
+        }
+      })
+
+      const fileUrl = res.data?.url || res.data?.data?.url
+
+      if (!fileUrl) {
+        throw new Error('No se pudo obtener la URL de Fivemanage')
+      }
+
+      // Save document to Firestore
       const docData = {
-        url: base64Data,
+        url: fileUrl,
         title: metadata.title || '',
         description: metadata.description || '',
         date: metadata.date || new Date().toISOString().split('T')[0],
@@ -115,7 +138,7 @@ export function useMomentos() {
       uploading.value = false
       return { id: docRef.id, ...docData }
     } catch (err) {
-      console.error('Error guardando imagen Base64:', err)
+      console.error('Error subiendo imagen a Fivemanage:', err)
       error.value = 'Error al procesar la imagen'
       uploading.value = false
       throw err

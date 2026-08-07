@@ -13,9 +13,9 @@ import {
 } from 'firebase/firestore'
 
 export function useCartas() {
-  const cartas  = ref([])
+  const cartas = ref([])
   const loading = ref(true)
-  const error   = ref(null)
+  const error = ref(null)
 
   const q = query(
     collection(db, 'cartas'),
@@ -28,19 +28,19 @@ export function useCartas() {
       cartas.value = snapshot.docs.map((docSnap) => {
         const data = docSnap.data()
         return {
-          id:        docSnap.id,
+          id: docSnap.id,
           ...data,
-          titulo:    data.titulo    || 'Sin título',
+          titulo: data.titulo || 'Sin título',
           contenido: data.contenido || '',
-          autor:     data.autor || data.de || '',
-          date:      data.date?.toDate?.() ?? null,
+          autor: data.autor || '',
+          date: data.date?.toDate?.() ?? null,
         }
       })
       loading.value = false
     },
     (err) => {
       console.error('useCartas error:', err)
-      error.value   = err
+      error.value = err
       loading.value = false
     }
   )
@@ -52,7 +52,7 @@ export function useCartas() {
       titulo,
       contenido,
       autor,
-      date:      date      ? Timestamp.fromDate(date) : null,
+      date: date ? Timestamp.fromDate(date) : null,
       createdAt: Timestamp.now(),
     })
   }

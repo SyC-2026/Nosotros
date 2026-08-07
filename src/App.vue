@@ -1,10 +1,12 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRelationshipStore } from './stores/relationship.js'
+import { useRelationshipTheme } from './composables/useRelationshipTheme.js'
 import { useSiteConfig } from './composables/useSiteConfig.js'
 import LockScreen from './components/LockScreen.vue'
 import MainLayout from './components/MainLayout.vue'
 import MaintenancePage from './components/MaintenancePage.vue'
+import DebugPanel from './components/DebugPanel.vue'
 import confetti from 'canvas-confetti'
 
 // Imágenes servidas desde /public/ — no se bundlean, carga lazy por el navegador
@@ -18,6 +20,7 @@ const currentBgIndex = ref(0)
 let bgInterval = null
 
 const store = useRelationshipStore()
+useRelationshipTheme()
 const isUnlocked = computed(() => store.isUnlocked)
 
 watch(isUnlocked, (newVal, oldVal) => {
@@ -113,6 +116,8 @@ const viewKey = computed(() => {
       :key="viewKey"
     />
   </transition>
+
+  <DebugPanel />
 </template>
 
 <style>

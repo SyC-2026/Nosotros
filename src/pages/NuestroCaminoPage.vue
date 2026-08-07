@@ -203,7 +203,7 @@ function closeImagePreview() {
 
       <!-- Loading -->
       <div v-if="loading" class="state-box">
-        <Icon icon="mdi:loading" class="spin-icon" />
+        <Icon icon="line-md:loading-loop" class="spin-icon" />
         <p>Cargando recuerdos...</p>
       </div>
 

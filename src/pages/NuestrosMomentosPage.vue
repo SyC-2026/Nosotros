@@ -2,6 +2,8 @@
 import { ref, computed } from 'vue'
 import { Icon } from '@iconify/vue'
 import BackButton from '../components/BackButton.vue'
+import DynamicFormModal from '../components/DynamicFormModal.vue'
+import LightboxModal from '../components/LightboxModal.vue'
 import { useMomentos } from '../composables/useMomentos.js'
 
 // Import local photos as fallback/initial set
@@ -42,25 +44,48 @@ const filteredMomentos = computed(() => {
   return momentos.value.filter((m) => m.albumId === activeAlbumId.value)
 })
 
-// Modal states for photo upload
-const showUploadModal = ref(false)
+// Shared Modal state for photo upload/edit
+const showPhotoModal = ref(false)
+const editPhotoTarget = ref(null)
+
+const photoFormData = ref({
+  title: '',
+  date: '',
+  albumId: 'none'
+})
+
+// File state for upload
 const selectedFile = ref(null)
 const filePreview = ref(null)
-const titleInput = ref('')
-const dateInput = ref(new Date().toISOString().split('T')[0])
-const targetAlbumId = ref('none')
+
+const photoModalTitle = computed(() => editPhotoTarget.value ? 'Editar Foto' : 'Subir Nueva Foto')
+const photoModalSchema = computed(() => {
+  const albumOptions = [{ label: 'Sin álbum', value: 'none' }, ...albums.value.map(a => ({ label: a.name, value: a.id }))]
+  const schema = []
+  
+  if (!editPhotoTarget.value) {
+    schema.push({ id: 'file', type: 'slot', fullWidth: true })
+  }
+  
+  schema.push(
+    { id: 'albumId', type: 'select', label: 'Álbum / Carpeta', options: albumOptions },
+    { id: 'title', type: 'text', label: 'Título o Descripción', placeholder: 'Ej: Viaje a la playa...' },
+    { id: 'date', type: 'date', label: 'Fecha del Momento' }
+  )
+
+  if (uploading.value) {
+    schema.push({ id: 'progress', type: 'slot', fullWidth: true })
+  }
+  
+  return schema
+})
 
 // Modal state for album creation
 const showAlbumModal = ref(false)
-const albumNameInput = ref('')
-const albumDescInput = ref('')
-
-// Modal state for photo editing
-const showEditModal = ref(false)
-const editPhotoId = ref(null)
-const editTitleInput = ref('')
-const editDateInput = ref('')
-const editAlbumIdInput = ref('none')
+const albumFormData = ref({ name: '' })
+const albumModalSchema = [
+  { id: 'name', type: 'text', label: 'Nombre del Álbum', placeholder: 'Ej: Vacaciones, Cumpleaños, Salidas...', fullWidth: true }
+]
 
 // ── Date formatter ────────────────────────────────────────────────────────────
 const dateFormatter = new Intl.DateTimeFormat('es-ES', {
@@ -77,30 +102,15 @@ function formatDate(dateStr) {
 
 function openEditPhoto(item) {
   if (item.isLocal) return
-  editPhotoId.value = item.id
-  editTitleInput.value = item.title || ''
-  editDateInput.value = item.date || new Date().toISOString().split('T')[0]
-  editAlbumIdInput.value = item.albumId || 'none'
-  showEditModal.value = true
+  editPhotoTarget.value = item
+  photoFormData.value.title = item.title || ''
+  photoFormData.value.date = item.date || new Date().toISOString().split('T')[0]
+  photoFormData.value.albumId = item.albumId || 'none'
+  showPhotoModal.value = true
 }
 
-async function submitEditPhoto() {
-  if (!editPhotoId.value) return
-  try {
-    await updateMomento(editPhotoId.value, {
-      title: editTitleInput.value,
-      date: editDateInput.value,
-      albumId: editAlbumIdInput.value
-    })
-    if (activeLightboxItem.value && activeLightboxItem.value.id === editPhotoId.value) {
-      activeLightboxItem.value.title = editTitleInput.value
-      activeLightboxItem.value.date = editDateInput.value
-      activeLightboxItem.value.albumId = editAlbumIdInput.value
-    }
-    showEditModal.value = false
-  } catch (err) {
-    alert('Error al actualizar la foto.')
-  }
+function closePhotoModal() {
+  showPhotoModal.value = false
 }
 
 // Lightbox state
@@ -110,6 +120,12 @@ function handleFileSelect(e) {
   const file = e.target.files[0]
   if (file) {
     selectedFile.value = file
+    
+    // Autocompletar el título si está vacío, usando el nombre del archivo sin extensión
+    if (!photoFormData.value.title.trim()) {
+      photoFormData.value.title = file.name.replace(/\.[^/.]+$/, "")
+    }
+
     const reader = new FileReader()
     reader.onload = (event) => {
       filePreview.value = event.target.result
@@ -119,43 +135,64 @@ function handleFileSelect(e) {
 }
 
 function openUploadModal() {
-  targetAlbumId.value = (activeAlbumId.value !== 'all' && activeAlbumId.value !== 'none') ? activeAlbumId.value : 'none'
-  showUploadModal.value = true
-}
-
-function resetUploadForm() {
+  editPhotoTarget.value = null
   selectedFile.value = null
   filePreview.value = null
-  titleInput.value = ''
-  dateInput.value = new Date().toISOString().split('T')[0]
-  showUploadModal.value = false
+  photoFormData.value.title = ''
+  photoFormData.value.date = new Date().toISOString().split('T')[0]
+  photoFormData.value.albumId = (activeAlbumId.value !== 'all' && activeAlbumId.value !== 'none') ? activeAlbumId.value : 'none'
+  showPhotoModal.value = true
 }
 
-async function submitMomento() {
-  if (!selectedFile.value) return
-
-  try {
-    await uploadMomento(selectedFile.value, {
-      title: titleInput.value,
-      date: dateInput.value,
-      albumId: targetAlbumId.value
-    })
-    resetUploadForm()
-  } catch (err) {
-    alert('Ocurrió un error al subir la foto. Inténtalo nuevamente.')
+async function handleSavePhoto() {
+  if (editPhotoTarget.value) {
+    try {
+      await updateMomento(editPhotoTarget.value.id, {
+        title: photoFormData.value.title,
+        date: photoFormData.value.date,
+        albumId: photoFormData.value.albumId
+      })
+      if (activeLightboxItem.value && activeLightboxItem.value.id === editPhotoTarget.value.id) {
+        activeLightboxItem.value.title = photoFormData.value.title
+        activeLightboxItem.value.date = photoFormData.value.date
+        activeLightboxItem.value.albumId = photoFormData.value.albumId
+      }
+      closePhotoModal()
+    } catch (err) {
+      alert('Error al actualizar la foto.')
+    }
+  } else {
+    if (!selectedFile.value) return
+    try {
+      await uploadMomento(selectedFile.value, {
+        title: photoFormData.value.title,
+        date: photoFormData.value.date,
+        albumId: photoFormData.value.albumId
+      })
+      closePhotoModal()
+    } catch (err) {
+      alert('Ocurrió un error al subir la foto. Inténtalo nuevamente.')
+    }
   }
 }
 
-async function submitAlbum() {
-  if (!albumNameInput.value.trim()) return
+function openAlbumModal() {
+  albumFormData.value.name = ''
+  showAlbumModal.value = true
+}
+
+function closeAlbumModal() {
+  showAlbumModal.value = false
+}
+
+async function handleSaveAlbum() {
+  if (!albumFormData.value.name.trim()) return
 
   try {
-    const newAlbum = await createAlbum(albumNameInput.value, albumDescInput.value)
+    const newAlbum = await createAlbum(albumFormData.value.name)
     if (newAlbum?.id) {
       activeAlbumId.value = newAlbum.id
     }
-    albumNameInput.value = ''
-    albumDescInput.value = ''
     showAlbumModal.value = false
   } catch (err) {
     alert('Error al crear el álbum.')
@@ -249,7 +286,7 @@ function closeLightbox() {
           <span class="albums-section-title">
             <Icon icon="mdi:folder-multiple-outline" />Álbumes
           </span>
-          <button class="btn-new-album" @click="showAlbumModal = true">
+          <button class="btn-new-album" @click="openAlbumModal">
             <Icon icon="mdi:plus" />
             Nuevo Álbum
           </button>
@@ -336,186 +373,82 @@ function closeLightbox() {
       <Icon icon="mdi:plus" />
     </button>
 
-    <!-- Upload Photo Modal -->
-    <transition name="modal-fade">
-      <div v-if="showUploadModal" class="modal-backdrop" @click.self="resetUploadForm">
-        <div class="modal-card">
-          <button class="btn-close-modal" @click="resetUploadForm">
-            <Icon icon="mdi:close" />
-          </button>
-          
-          <h2 class="modal-title">Subir Nueva Foto</h2>
+    <!-- Upload/Edit Photo Modal -->
+    <DynamicFormModal
+      :show="showPhotoModal"
+      :title="photoModalTitle"
+      :schema="photoModalSchema"
+      v-model="photoFormData"
+      :loading="uploading"
+      saveText="Guardar foto"
+      saveIcon="mdi:cloud-upload-outline"
+      @close="closePhotoModal"
+      @save="handleSavePhoto"
+    >
+      <template #field-file>
+        <div class="form-group">
+          <label class="file-drop-area" :class="{ 'has-file': filePreview }">
+            <input type="file" accept="image/*" @change="handleFileSelect" hidden />
+            <img v-if="filePreview" :src="filePreview" class="preview-image" />
+            <div v-else class="drop-placeholder">
+              <Icon icon="mdi:image-plus" class="upload-icon" />
+              <span>Toca para seleccionar una foto</span>
+            </div>
+          </label>
+        </div>
+      </template>
 
-          <div class="form-group">
-            <label>Álbum de destino:</label>
-            <select v-model="targetAlbumId" class="form-input">
-              <option value="none">Sin álbum</option>
-              <option v-for="album in albums" :key="album.id" :value="album.id">
-                {{ album.name }}
-              </option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label class="file-drop-area" :class="{ 'has-file': filePreview }">
-              <input type="file" accept="image/*" @change="handleFileSelect" hidden />
-              <img v-if="filePreview" :src="filePreview" class="preview-image" />
-              <div v-else class="drop-placeholder">
-                <Icon icon="mdi:cloud-upload-outline" class="upload-icon" />
-                <span>Toca para seleccionar una foto</span>
-              </div>
-            </label>
-          </div>
-
-          <div class="form-group">
-            <label>Título o Descripción (Opcional):</label>
-            <input
-              v-model="titleInput"
-              type="text"
-              placeholder="Ej: Viaje a la playa, Tarde de café..."
-              class="form-input"
-            />
-          </div>
-
-          <div class="form-group">
-            <label>Fecha del Momento:</label>
-            <input v-model="dateInput" type="date" class="form-input" />
-          </div>
-
-          <div v-if="uploading" class="progress-bar-container">
+      <template #field-progress>
+        <div class="progress-wrapper">
+          <div class="progress-text">Subiendo... {{ uploadProgress }}%</div>
+          <div class="progress-bar-container">
             <div class="progress-bar-fill" :style="{ width: uploadProgress + '%' }"></div>
-            <span class="progress-text">Subiendo... {{ uploadProgress }}%</span>
-          </div>
-
-          <div class="modal-actions">
-            <button class="btn-cancel" @click="resetUploadForm" :disabled="uploading">Cancelar</button>
-            <button class="btn-submit" @click="submitMomento" :disabled="!selectedFile || uploading">
-              <Icon v-if="uploading" icon="mdi:loading" class="spin-icon-sm" />
-              <span v-else>Guardar Foto</span>
-            </button>
           </div>
         </div>
-      </div>
-    </transition>
+      </template>
+    </DynamicFormModal>
 
     <!-- Create Album Modal -->
-    <transition name="modal-fade">
-      <div v-if="showAlbumModal" class="modal-backdrop" @click.self="showAlbumModal = false">
-        <div class="modal-card">
-          <button class="btn-close-modal" @click="showAlbumModal = false">
-            <Icon icon="mdi:close" />
-          </button>
-          
-          <h2 class="modal-title">Crear Nuevo Álbum</h2>
-
-          <div class="form-group">
-            <label>Nombre del Álbum:</label>
-            <input
-              v-model="albumNameInput"
-              type="text"
-              placeholder="Ej: Vacaciones, Cumpleaños, Salidas..."
-              class="form-input"
-              @keyup.enter="submitAlbum"
-            />
-          </div>
-
-          <div class="modal-actions">
-            <button class="btn-cancel" @click="showAlbumModal = false">Cancelar</button>
-            <button class="btn-submit" @click="submitAlbum" :disabled="!albumNameInput.trim()">
-              Crear Álbum
-            </button>
-          </div>
-        </div>
-      </div>
-    </transition>
+    <DynamicFormModal
+      :show="showAlbumModal"
+      title="Crear Nuevo Álbum"
+      :schema="albumModalSchema"
+      v-model="albumFormData"
+      saveText="Crear Álbum"
+      saveIcon="mdi:folder-plus-outline"
+      @close="closeAlbumModal"
+      @save="handleSaveAlbum"
+    />
 
     <!-- Lightbox Modal -->
-    <transition name="modal-fade">
-      <div v-if="activeLightboxItem" class="lightbox-backdrop" @click.self="closeLightbox">
-        <div class="lightbox-content">
-          <!-- <button class="btn-close-lightbox" @click="closeLightbox">
-            <Icon icon="mdi:close" />
-          </button> -->
+    <LightboxModal
+      :show="!!activeLightboxItem"
+      :imageUrl="activeLightboxItem?.url || ''"
+      :title="activeLightboxItem?.title || ''"
+      :date="formatDate(activeLightboxItem?.date) || ''"
+      @close="closeLightbox"
+    >
+      <template #actions v-if="activeLightboxItem && !activeLightboxItem.isLocal">
+        <button
+          class="btn-card-action"
+          @click="openEditPhoto(activeLightboxItem)"
+          title="Editar foto"
+        >
+          <Icon icon="mdi:pencil-outline" />
+        </button>
 
-          <div class="lightbox-image-container">
-            <img :src="activeLightboxItem.url" :alt="activeLightboxItem.title" />
-          </div>
+        <button
+          class="btn-card-action btn-card-delete"
+          :class="{ confirm: deletingPhotoId === activeLightboxItem.id }"
+          @click="handleDelete(activeLightboxItem)"
+          :title="deletingPhotoId === activeLightboxItem.id ? 'Toca de nuevo para confirmar' : 'Eliminar foto'"
+        >
+          <Icon :icon="deletingPhotoId === activeLightboxItem.id ? 'mdi:alert-circle' : 'mdi:trash-can-outline'" />
+        </button>
+      </template>
+    </LightboxModal>
 
-          <div class="lightbox-details">
-            <div class="lightbox-text">
-              <h3 v-if="activeLightboxItem.title">{{ activeLightboxItem.title }}</h3>
-              <p v-if="activeLightboxItem.date" class="lightbox-date">
-                <Icon icon="mdi:calendar-heart" /> {{ formatDate(activeLightboxItem.date) }}
-              </p>
-            </div>
 
-            <div v-if="!activeLightboxItem.isLocal" class="lightbox-actions">
-              <button
-                class="btn-card-action"
-                @click="openEditPhoto(activeLightboxItem)"
-                title="Editar foto"
-              >
-                <Icon icon="mdi:pencil-outline" />
-              </button>
-
-              <button
-                class="btn-card-action btn-card-delete"
-                :class="{ confirm: deletingPhotoId === activeLightboxItem.id }"
-                @click="handleDelete(activeLightboxItem)"
-                :title="deletingPhotoId === activeLightboxItem.id ? 'Toca de nuevo para confirmar' : 'Eliminar foto'"
-              >
-                <Icon :icon="deletingPhotoId === activeLightboxItem.id ? 'mdi:alert-circle' : 'mdi:trash-can-outline'" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </transition>
-
-    <!-- Edit Photo Modal -->
-    <transition name="modal-fade">
-      <div v-if="showEditModal" class="modal-backdrop" @click.self="showEditModal = false">
-        <div class="modal-card">
-          <button class="btn-close-modal" @click="showEditModal = false">
-            <Icon icon="mdi:close" />
-          </button>
-          
-          <h2 class="modal-title">Editar Foto</h2>
-
-          <div class="form-group">
-            <label>Nombre / Título de la foto:</label>
-            <input
-              v-model="editTitleInput"
-              type="text"
-              placeholder="Ej: Viaje a la playa, Tarde de café..."
-              class="form-input"
-            />
-          </div>
-
-          <div class="form-group">
-            <label>Mover al Álbum / Carpeta:</label>
-            <select v-model="editAlbumIdInput" class="form-input">
-              <option value="none">Sin álbum</option>
-              <option v-for="album in albums" :key="album.id" :value="album.id">
-                {{ album.name }}
-              </option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label>Fecha del Momento:</label>
-            <input v-model="editDateInput" type="date" class="form-input" />
-          </div>
-
-          <div class="modal-actions">
-            <button class="btn-cancel" @click="showEditModal = false">Cancelar</button>
-            <button class="btn-submit" @click="submitEditPhoto">
-              Guardar Cambios
-            </button>
-          </div>
-        </div>
-      </div>
-    </transition>
   </div>
 </template>
 
@@ -1021,16 +954,25 @@ function closeLightbox() {
   object-fit: cover;
 }
 
+.progress-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  width: 100%;
+}
+.progress-text {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--theme-text-main);
+  text-align: right;
+}
 .progress-bar-container {
-  height: 24px;
-  background: rgba(0,0,0,0.05);
-  border-radius: 12px;
+  height: 8px;
+  background: var(--theme-card-border);
+  border-radius: 4px;
   overflow: hidden;
   position: relative;
-  margin-bottom: 1.25rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  width: 100%;
 }
 .progress-bar-fill {
   position: absolute;
@@ -1038,14 +980,7 @@ function closeLightbox() {
   top: 0;
   bottom: 0;
   background: var(--theme-primary);
-  transition: width 0.2s ease;
-}
-.progress-text {
-  position: relative;
-  z-index: 2;
-  font-size: 0.8rem;
-  font-weight: bold;
-  color: var(--theme-text-main);
+  transition: width 0.3s ease;
 }
 
 .modal-actions {
@@ -1077,69 +1012,7 @@ function closeLightbox() {
   cursor: not-allowed;
 }
 
-/* Lightbox Styling */
-.lightbox-content {
-  max-width: 900px;
-  max-height: 90vh;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  position: relative;
-}
-.btn-close-lightbox {
-  position: absolute;
-  top: -2.5rem;
-  right: 0;
-  background: none;
-  border: none;
-  color: white;
-  font-size: 2rem;
-  cursor: pointer;
-}
-.lightbox-image-container {
-  max-height: 75vh;
-  width: 100%;
-  display: flex;
-  justify-content: center;
-}
-.lightbox-image-container img {
-  max-height: 75vh;
-  max-width: 100%;
-  object-fit: contain;
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-}
-.lightbox-details {
-  margin-top: 1rem;
-  background: var(--theme-card-bg);
-  padding: 1rem 1.5rem;
-  border-radius: 12px;
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  box-sizing: border-box;
-}
-.lightbox-text h3 {
-  margin: 0;
-  font-family: 'Cause', 'Georgia', serif;
-  font-size: 1.2rem;
-  color: var(--theme-text-main);
-}
-.lightbox-date {
-  margin: 0.25rem 0 0;
-  font-size: 0.85rem;
-  color: var(--theme-text-muted);
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-}
-.lightbox-actions {
-  display: flex;
-  align-items: center;
-  gap: 0.2rem;
-}
+
 .btn-card-action {
   background: none;
   border: none;
